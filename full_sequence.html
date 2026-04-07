@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试全部碱基序列峰图</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .image-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .json-output {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        table {
+            margin-top: 10px;
+        }
+        h4 {
+            color: #555;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+        .form-group p {
+            margin: 5px 0;
+        }
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>基因组比对 - AB1文件分析</h1>
+        
+        <form id="fullSequenceForm">
+            <div class="form-group">
+                <label for="ab1File">选择AB1文件：</label>
+                <input type="file" id="ab1File" name="file" accept=".ab1" required>
+                <p>提示：选择AB1文件进行基因组比对分析。系统会自动从文件名中解析位置信息。</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="genomeVersion">参考基因组版本：</label>
+                <select id="genomeVersion" name="genome_version">
+                    <option value="hg19">hg19 (GRCh37)</option>
+                    <option value="hg38">hg38 (GRCh38)</option>
+                </select>
+                <p>提示：选择参考基因组版本进行比对</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="windowSize">窗口大小（bp）：</label>
+                <input type="number" id="windowSize" name="window_size" value="10" min="1" max="100">
+            </div>
+            
+            <div class="form-group">
+                <label for="chrom">染色体（可选）：</label>
+                <input type="text" id="chrom" name="chrom" placeholder="留空则从BWA比对结果中获取">
+                <p id="chromHint" style="font-size: 12px; color: #666;">留空则从BWA比对结果中自动获取</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="pos">位置（可选）：</label>
+                <input type="number" id="pos" name="pos" placeholder="例如：139409940">
+                <p id="posHint" style="font-size: 12px; color: #666;"></p>
+            </div>
+            
+            <button type="submit">执行比对分析</button>
+        </form>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div id="result" class="result" style="display: none;">
+            <h3>比对结果：</h3>
+            
+            <div class="form-group">
+                <h4>基本信息：</h4>
+                <div id="basicInfo"></div>
+            </div>
+            
+            <div class="form-group">
+                <h4>变异信息：</h4>
+                <div id="variantsInfo"></div>
+            </div>
+            
+            <div class="form-group">
+                <h4>峰图：</h4>
+                <div class="image-container">
+                    <img id="sequenceImage" src="" alt="序列峰图" style="display: none;">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <h4>样本序列：</h4>
+                <div class="json-output" id="sampleSequence"></div>
+            </div>
+            
+            <div class="form-group">
+                <h4>参考序列：</h4>
+                <div class="json-output" id="referenceSequence"></div>
+            </div>
+            
+            <div class="form-group">
+                <h4>完整JSON响应：</h4>
+                <div class="json-output" id="jsonOutput"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 异步加载基因组版本，不阻塞其他操作
+            loadAvailableGenomes().catch(error => {
+                console.error('加载基因组版本失败:', error);
+            });
+            setupFileChangeListener();
+        });
+        
+        function setupFileChangeListener() {
+            const fileInput = document.getElementById('ab1File');
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    parseFilenameAndFillForm(file.name);
+                }
+            });
+        }
+        
+        function parseFilenameAndFillForm(filename) {
+            const posInput = document.getElementById('pos');
+            const posHint = document.getElementById('posHint');
+            
+            const patterns = [
+            /(chr[\w]+):(\d+)/,          // chr7:140453136 (最高优先级)
+            /(chr[\w]+)-(\d+)/,          // chr7-140453136
+            /(chr[\w]+)_(\d+)/,          // chr7_140453136
+            /(\d+):(\d+)-(\d+)/,         // 7:140453136-140453236
+            /([\w]+):(\d+)-(\d+)/,        // 其他格式
+            /-(\d{4,9})_/,               // -139409940_ (前面有连字符，后面有下划线)
+            /_(\d{4,9})_/,               // _139409940_ (4-9位数字，前后有下划线)
+            /([A-Z0-9]+)_(\d{4,9})_/, //基因名_位置_ (如 NOTCH1_139409940_)
+            /(\w+)-(\d+)-/,               // 基因名-位置- (如 12SrRNA-1095-F) (最低优先级)
+        ];
+            
+            let pos = null;
+            
+            for (const pattern of patterns) {
+                const match = filename.match(pattern);
+                if (match) {
+                    if (match.length === 3) {
+                        pos = parseInt(match[2]);
+                        break;
+                    } else if (match.length === 2) {
+                        pos = parseInt(match[1]);
+                        break;
+                    }
+                }
+            }
+            
+            if (pos) {
+                posInput.value = pos;
+                posHint.textContent = `从文件名解析: ${pos}`;
+            } else {
+                posHint.textContent = '未从文件名解析到位置信息';
+            }
+        }
+        
+        async function loadAvailableGenomes() {
+            try {
+                const response = await fetch('http://localhost:8080/');
+                const data = await response.json();
+                
+                const genomeSelect = document.getElementById('genomeVersion');
+                const availableGenomes = data.available_genomes || ['hg19'];
+                
+                genomeSelect.innerHTML = '';
+                
+                const genomeNames = {
+                    'hg19': 'hg19 (GRCh37)',
+                    'hg38': 'hg38 (GRCh38)'
+                };
+                
+                availableGenomes.forEach(genome => {
+                    const option = document.createElement('option');
+                    option.value = genome;
+                    option.textContent = genomeNames[genome] || genome;
+                    genomeSelect.appendChild(option);
+                });
+                
+                if (availableGenomes.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = 'hg19';
+                    option.textContent = 'hg19 (默认)';
+                    genomeSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error('加载基因组版本失败:', error);
+            }
+        }
+        
+        document.getElementById('fullSequenceForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const file = document.getElementById('ab1File').files[0];
+            const genomeVersion = document.getElementById('genomeVersion').value;
+            const windowSize = document.getElementById('windowSize').value;
+            const chrom = document.getElementById('chrom').value.trim();
+            const pos = document.getElementById('pos').value.trim();
+            
+            console.log('表单提交开始...');
+            console.log('文件:', file ? file.name : '未选择');
+            console.log('基因组版本:', genomeVersion);
+            console.log('窗口大小:', windowSize);
+            console.log('染色体:', chrom);
+            console.log('位置:', pos);
+            
+            if (!file) {
+                alert('请选择AB1文件');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = '正在处理，请稍候...';
+            statusDiv.className = 'status success';
+            statusDiv.style.display = 'block';
+            
+            document.getElementById('result').style.display = 'none';
+            
+            try {
+                console.log('创建FormData对象...');
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('genome_version', genomeVersion);
+                formData.append('window_size', windowSize);
+                if (chrom) formData.append('chrom', chrom);
+                if (pos) formData.append('pos', pos);
+                
+                console.log('发送JSON请求...');
+                console.log('参数: file=', file.name, ', genome_version=', genomeVersion, ', window_size=', windowSize, ', chrom=', chrom || '(未指定，使用bwa结果)', ', pos=', pos || '(从文件名解析)');
+                const jsonResponse = await fetch('http://120.237.96.3:8000/api/align/json', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('JSON响应状态:', jsonResponse.status);
+                
+                if (!jsonResponse.ok) {
+                    const jsonError = await jsonResponse.text();
+                    throw new Error(`JSON请求失败 (${jsonResponse.status}): ${jsonError}`);
+                }
+                
+                console.log('解析JSON响应...');
+                const jsonData = await jsonResponse.json();
+                console.log('JSON数据:', jsonData);
+                
+                console.log('重新创建FormData对象发送图片请求...');
+                const formData2 = new FormData();
+                formData2.append('file', file);
+                formData2.append('genome_version', genomeVersion);
+                formData2.append('window_size', windowSize);
+                if (chrom) formData2.append('chrom', chrom);
+                if (pos) formData2.append('pos', pos);
+                
+                console.log('发送图片请求...');
+                const imageResponse = await fetch('http://120.237.96.3:8000/api/align', {
+                    method: 'POST',
+                    body: formData2
+                });
+                
+                console.log('图片响应状态:', imageResponse.status);
+                
+                if (!imageResponse.ok) {
+                    const imageError = await imageResponse.text();
+                    throw new Error(`图片请求失败 (${imageResponse.status}): ${imageError}`);
+                }
+                
+                console.log('解析图片响应...');
+                const imageBlob = await imageResponse.blob();
+                console.log('图片大小:', imageBlob.size, 'bytes');
+                const imageUrl = URL.createObjectURL(imageBlob);
+                
+                console.log('显示结果...');
+                statusDiv.textContent = '处理成功！';
+                statusDiv.className = 'status success';
+                
+                displayResults(jsonData, imageUrl);
+                document.getElementById('result').style.display = 'block';
+                
+            } catch (error) {
+                console.error('错误详情:', error);
+                statusDiv.textContent = '错误: ' + error.message;
+                statusDiv.className = 'status error';
+            }
+        });
+        
+        function displayResults(data, imageUrl) {
+            console.log('displayResults开始...');
+            console.log('数据:', data);
+            console.log('图片URL:', imageUrl);
+            
+            const basicInfo = document.getElementById('basicInfo');
+            const variantsInfo = document.getElementById('variantsInfo');
+            const sampleSequence = document.getElementById('sampleSequence');
+            const referenceSequence = document.getElementById('referenceSequence');
+            const jsonOutput = document.getElementById('jsonOutput');
+            const sequenceImage = document.getElementById('sequenceImage');
+            
+            try {
+                basicInfo.innerHTML = `
+                    <p><strong>文件名：</strong> ${data.filename || 'N/A'}</p>
+                    <p><strong>染色体：</strong> ${data.chrom || 'N/A'}</p>
+                    <p><strong>位置：</strong> ${data.pos || 'N/A'}</p>
+                    <p><strong>窗口大小：</strong> ${data.window_size || 'N/A'} bp</p>
+                    <p><strong>比对质量：</strong> ${data.alignment_score ? data.alignment_score.toFixed(2) + '%' : 'N/A'}</p>
+                    <p><strong>CIGAR：</strong> ${data.cigar || 'N/A'}</p>
+                    <p><strong>MAPQ：</strong> ${data.mapq || 'N/A'}</p>
+                    <p><strong>样本序列长度：</strong> ${data.sample_length || (data.sample_sequence ? data.sample_sequence.length : 'N/A')}</p>
+                    <p><strong>参考序列长度：</strong> ${data.reference_length || (data.reference_sequence ? data.reference_sequence.length : 'N/A')}</p>
+                `;
+                
+                if (data.variants && data.variants.length > 0) {
+                    let variantsHtml = '<table style="width: 100%; border-collapse: collapse;">';
+                    variantsHtml += '<tr style="background-color: #f0f0f0;"><th style="border: 1px solid #ddd; padding: 8px;">位置</th><th style="border: 1px solid #ddd; padding: 8px;">类型</th><th style="border: 1px solid #ddd; padding: 8px;">参考</th><th style="border: 1px solid #ddd; padding: 8px;">变异</th></tr>';
+                    
+                    data.variants.forEach(variant => {
+                        const [pos, type, ref, alt] = variant;
+                        const typeColors = {
+                            'mutation': '#ff6b6b',
+                            'deletion': '#ffa502',
+                            'insertion': '#2ed573'
+                        };
+                        const color = typeColors[type] || '#333';
+                        
+                        variantsHtml += `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${pos}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; color: ${color}; font-weight: bold;">${type}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${ref}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; color: ${color}; font-weight: bold;">${alt}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    variantsHtml += '</table>';
+                    variantsHtml += `<p><strong>共发现 ${data.variants.length} 个变异</strong></p>`;
+                    variantsInfo.innerHTML = variantsHtml;
+                } else {
+                    variantsInfo.innerHTML = '<p>未发现变异</p>';
+                }
+                
+                sampleSequence.textContent = data.sample_sequence || 'N/A';
+                referenceSequence.textContent = data.reference_sequence || 'N/A';
+                jsonOutput.textContent = JSON.stringify(data, null, 2);
+                
+                if (imageUrl) {
+                    sequenceImage.src = imageUrl;
+                    sequenceImage.style.display = 'block';
+                }
+                
+                console.log('displayResults完成');
+            } catch (error) {
+                console.error('displayResults错误:', error);
+                basicInfo.innerHTML = `<p style="color: red;">显示结果时出错: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
