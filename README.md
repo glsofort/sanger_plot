@@ -1,210 +1,199 @@
 # sanger_plot
 
-# 基因组比对API
-
-基于 FastAPI 的 AB1 文件与参考基因组比对服务。
+基于 FastAPI 的 Sanger AB1 文件与参考基因组比对服务，支持单文件、批量分析，以及返回 PNG 图像或 JSON 结果。
 
 ## 功能特性
 
-- 单个AB1文件比对
-- 批量AB1文件处理
-- 返回JSON数据或PNG图片
-- 使用BWA进行序列比对
+- 单个 AB1 文件比对
+- 批量 AB1 文件处理
+- 返回 JSON 数据或 PNG 图片
+- 使用 BWA 进行序列比对
 - 自动检测反向测序
+- 支持 Docker / Docker Compose 部署
 
-## 安装依赖
+## 本地运行
+
+### 1. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 启动服务
+还需要系统中可用的 `bwa` 命令。
+
+### 2. 配置参考基因组
+
+程序默认读取以下环境变量：
+
+- `DEFAULT_REF_FILE`
+- `HG19_REF_FILE`
+- `HG38_REF_FILE`
+- `OUTPUT_DIR`
+- `TEMP_DIR`
+
+示例：
+
+```bash
+export HG19_REF_FILE=/data/reference/hg19/hs37d5.fa
+export HG38_REF_FILE=/data/reference/hg38/hg38.fa
+export DEFAULT_REF_FILE=$HG19_REF_FILE
+```
+
+### 3. 启动服务
 
 ```bash
 python api.py
 ```
 
-服务将在 `http://localhost:8000` 启动。
+服务默认启动在 [http://localhost:8000](http://localhost:8000)。
 
-## API文档
+## Docker 部署
 
-启动服务后，访问以下地址查看自动生成的API文档：
+### 目录约定
 
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+建议将参考基因组放在项目下：
 
-## API端点
-
-### 1. 根路径
+```text
+data/
+  reference/
+    hg19/
+      hs37d5.fa
+      hs37d5.fa.amb
+      hs37d5.fa.ann
+      hs37d5.fa.bwt
+      hs37d5.fa.pac
+      hs37d5.fa.sa
+    hg38/
+      hg38.fa
+      hg38.fa.amb
+      hg38.fa.ann
+      hg38.fa.bwt
+      hg38.fa.pac
+      hg38.fa.sa
 ```
-GET /
-```
-返回API基本信息。
 
-### 2. 健康检查
-```
-GET /api/health
-```
-返回服务健康状态。
+如果没有索引文件，应用首次运行时会尝试执行 `bwa index`。
 
-### 3. 单个文件比对
-```
-POST /api/align
-```
+### 使用 Docker Compose
 
-**参数:**
-- `file`: AB1文件（必需）
-- `window_size`: 显示窗口大小（可选，默认10bp）
-- `ref_file`: 参考基因组文件路径（可选）
-- `chrom`: 手动指定染色体（可选）
-- `pos`: 手动指定位置（可选）
-- `return_json`: 是否返回JSON数据（可选，默认False）
-
-**返回:**
-- `return_json=False`: PNG图片文件
-- `return_json=True`: JSON数据
-
-**示例（curl）:**
 ```bash
-# 返回图片
-curl -X POST "http://localhost:8000/api/align" \
-  -F "file=@sample.ab1" \
-  -F "window_size=10" \
-  -o output.png
+docker compose up -d --build
+```
 
-# 返回JSON
+默认行为：
+
+- 服务端口映射为 `8000:8000`
+- 输出图片持久化到 `./outputs`
+- 参考基因组以只读方式挂载到容器内 `/data/reference`
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+### 使用 Docker 命令
+
+构建镜像：
+
+```bash
+docker build -t sanger-plot:latest .
+```
+
+运行容器：
+
+```bash
+docker run -d \
+  --name sanger_plot \
+  -p 8000:8000 \
+  -e DEFAULT_REF_FILE=/data/reference/hg19/hs37d5.fa \
+  -e HG19_REF_FILE=/data/reference/hg19/hs37d5.fa \
+  -e HG38_REF_FILE=/data/reference/hg38/hg38.fa \
+  -v ./outputs:/app/outputs \
+  -v ./data/reference:/data/reference:ro \
+  sanger-plot:latest
+```
+
+## API 文档
+
+启动后可访问：
+
+- Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+- ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+## API 端点
+
+### `GET /`
+
+返回 API 基本信息和可用参考基因组版本。
+
+### `GET /api/health`
+
+返回服务健康状态与当前检测到的可用参考基因组。
+
+### `GET /full_sequence.html`
+
+返回内置测试页面。
+
+### `POST /api/align`
+
+单个 AB1 文件比对。
+
+表单参数：
+
+- `file`: AB1 文件，必填
+- `genome_version`: `hg19` 或 `hg38`，默认 `hg19`
+- `window_size`: 显示窗口大小，默认 `10`
+- `ref_file`: 自定义参考基因组路径，可选
+- `chrom`: 手动指定染色体，可选
+- `pos`: 手动指定位置，可选
+- `return_json`: 是否返回 JSON，默认 `false`
+
+### `POST /api/align/batch`
+
+批量 AB1 文件比对。
+
+表单参数：
+
+- `files`: 多个 AB1 文件，必填
+- `genome_version`: `hg19` 或 `hg38`，默认 `hg19`
+- `window_size`: 显示窗口大小，默认 `10`
+- `ref_file`: 自定义参考基因组路径，可选
+- `return_json`: 是否返回 JSON，默认 `true`
+- `chrom`: 手动指定染色体，可选
+- `pos`: 手动指定位置，可选
+
+### `POST /api/align/json`
+
+返回 JSON 结果，不生成图片。
+
+## 调用示例
+
+### 单文件返回 JSON
+
+```bash
 curl -X POST "http://localhost:8000/api/align" \
   -F "file=@sample.ab1" \
+  -F "genome_version=hg19" \
   -F "window_size=10" \
   -F "return_json=true"
 ```
 
-**示例（Python）:**
-```python
-import requests
+### 批量处理
 
-# 返回图片
-with open('sample.ab1', 'rb') as f:
-    response = requests.post(
-        'http://localhost:8000/api/align',
-        files={'file': f},
-        data={'window_size': 10}
-    )
-with open('output.png', 'wb') as f:
-    f.write(response.content)
-
-# 返回JSON
-with open('sample.ab1', 'rb') as f:
-    response = requests.post(
-        'http://localhost:8000/api/align',
-        files={'file': f},
-        data={'window_size': 10, 'return_json': True}
-    )
-result = response.json()
-print(result)
-```
-
-### 4. 批量文件比对
-```
-POST /api/align/batch
-```
-
-**参数:**
-- `files`: AB1文件列表（必需）
-- `window_size`: 显示窗口大小（可选，默认10bp）
-- `ref_file`: 参考基因组文件路径（可选）
-- `return_json`: 是否返回JSON数据（可选，默认False）
-
-**示例（curl）:**
 ```bash
 curl -X POST "http://localhost:8000/api/align/batch" \
   -F "files=@sample1.ab1" \
   -F "files=@sample2.ab1" \
-  -F "window_size=10" \
+  -F "genome_version=hg19" \
   -F "return_json=true"
 ```
 
-**示例（Python）:**
-```python
-import requests
+## 输出说明
 
-files = [
-    ('files', open('sample1.ab1', 'rb')),
-    ('files', open('sample2.ab1', 'rb'))
-]
-
-response = requests.post(
-    'http://localhost:8000/api/align/batch',
-    files=files,
-    data={'window_size': 10, 'return_json': True}
-)
-
-result = response.json()
-print(result)
-```
-
-### 5. JSON数据返回
-```
-POST /api/align/json
-```
-
-专门用于返回JSON数据的端点，不生成图片。
-
-**参数:**
-- `file`: AB1文件（必需）
-- `window_size`: 显示窗口大小（可选，默认10bp）
-- `ref_file`: 参考基因组文件路径（可选）
-- `chrom`: 手动指定染色体（可选）
-- `pos`: 手动指定位置（可选）
-
-**返回JSON数据结构:**
-```json
-{
-  "status": "success",
-  "filename": "sample.ab1",
-  "chrom": "chr7",
-  "pos": 140453136,
-  "window_size": 10,
-  "sample_sequence": "ATCG...",
-  "reference_sequence": "ATCG...",
-  "variants": [
-    {
-      "position": 15,
-      "type": "mutation",
-      "ref": "A",
-      "alt": "T"
-    }
-  ],
-  "alignment_score": 98.5,
-  "cigar": "100M",
-  "mapq": 60,
-  "timestamp": "2024-01-01T12:00:00"
-}
-```
-
-## 返回数据说明
-
-### 变异类型
-- `mutation`: 碱基替换
-- `deletion`: 缺失
-- `insertion`: 插入
-
-### 变异数据结构
-```json
-{
-  "position": 15,
-  "type": "mutation",
-  "ref": "A",
-  "alt": "T"
-}
-```
-
-## 注意事项
-
-1. 确保已安装BWA工具并配置好参考基因组索引
-2. 默认参考基因组路径: `/home/df/test/hg19/hs37d5.fa`
-3. 需要同目录下的 `get_reference.py` 脚本
-4. 临时文件存储在系统临时目录中
+- 生成的 PNG 文件会保存到 `OUTPUT_DIR`
+- API 同时会暴露 `/outputs/<filename>` 静态路径访问生成图片
+- 批量接口返回的 `image_url` 会自动使用当前请求地址生成
 
 ## 依赖项
 
@@ -213,9 +202,8 @@ POST /api/align/json
 - Biopython
 - NumPy
 - Matplotlib
-- BWA（系统工具）
+- BWA
 
 ## 许可证
 
 MIT License
->>>>>>> 8172053 (Initial commit: Add Sanger sequencing analysis tools)

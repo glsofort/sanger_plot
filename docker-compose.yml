@@ -1,0 +1,18 @@
+services:
+  sanger-plot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sanger_plot
+    ports:
+      - "8000:8000"
+    environment:
+      OUTPUT_DIR: /app/outputs
+      TEMP_DIR: /tmp/sanger_plot
+      DEFAULT_REF_FILE: /data/reference/hg19/hs37d5.fa
+      HG19_REF_FILE: /data/reference/hg19/hs37d5.fa
+      HG38_REF_FILE: /data/reference/hg38/hg38.fa
+    volumes:
+      - ./outputs:/app/outputs
+      - ./data/reference:/data/reference:ro
+    restart: unless-stopped

@@ -3,441 +3,1357 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>测试全部碱基序列峰图</title>
+    <title>Sanger Plot Studio</title>
     <style>
+        :root {
+            --bg: #f6f0e8;
+            --panel: rgba(255, 252, 247, 0.88);
+            --panel-strong: #fffaf4;
+            --ink: #1f1a17;
+            --muted: #6f6258;
+            --line: rgba(52, 38, 26, 0.12);
+            --accent: #d55c2f;
+            --accent-deep: #a83e18;
+            --accent-soft: rgba(213, 92, 47, 0.12);
+            --green: #1f7a4f;
+            --green-soft: rgba(31, 122, 79, 0.12);
+            --red: #a33434;
+            --red-soft: rgba(163, 52, 52, 0.12);
+            --shadow: 0 24px 80px rgba(59, 35, 18, 0.12);
+            --radius-xl: 28px;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+            --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            --serif: Georgia, "Times New Roman", serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+            margin: 0;
+            min-height: 100vh;
+            font-family: var(--sans);
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(213, 92, 47, 0.20), transparent 28%),
+                radial-gradient(circle at 85% 10%, rgba(31, 122, 79, 0.14), transparent 22%),
+                linear-gradient(135deg, #f3eadf 0%, #f7f2ea 55%, #efe3d1 100%);
         }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(79, 54, 34, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(79, 54, 34, 0.04) 1px, transparent 1px);
+            background-size: 32px 32px;
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), transparent 70%);
         }
-        h1 {
-            text-align: center;
-            color: #333;
+
+        .shell {
+            width: min(1220px, calc(100% - 32px));
+            margin: 28px auto 48px;
+            position: relative;
+            z-index: 1;
         }
-        .form-group {
-            margin-bottom: 20px;
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 22px;
+            align-items: stretch;
+            margin-bottom: 24px;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+
+        .hero-card,
+        .panel,
+        .metric-card,
+        .result-card,
+        .batch-card {
+            background: var(--panel);
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
         }
-        input[type="file"] {
-            margin-bottom: 10px;
+
+        .hero-card {
+            border-radius: 32px;
+            padding: 30px 32px;
+            position: relative;
+            overflow: hidden;
         }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
+
+        .hero-card::after {
+            content: "";
+            position: absolute;
+            right: -42px;
+            top: -42px;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(213, 92, 47, 0.24), transparent 70%);
         }
-        button:hover {
-            background-color: #45a049;
-        }
-        .result {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 4px;
-        }
-        .image-container {
-            margin-top: 20px;
-            text-align: center;
-        }
-        img {
-            max-width: 100%;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .json-output {
-            background-color: #f0f0f0;
-            padding: 10px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            font-family: monospace;
+
+        .hero-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(31, 26, 23, 0.06);
+            color: var(--muted);
             font-size: 12px;
-            max-height: 400px;
-            overflow-y: auto;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
         }
-        .status {
-            padding: 10px;
+
+        .hero h1 {
+            margin: 18px 0 14px;
+            font-family: var(--serif);
+            font-size: clamp(2.6rem, 4vw, 4.4rem);
+            line-height: 0.95;
+            font-weight: 700;
+            max-width: 10ch;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 56ch;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            align-self: stretch;
+        }
+
+        .metric-card {
+            border-radius: 26px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 170px;
+        }
+
+        .metric-card strong {
+            font-family: var(--serif);
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+
+        .metric-card span {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 360px minmax(0, 1fr);
+            gap: 22px;
+        }
+
+        .panel {
+            border-radius: var(--radius-xl);
+            padding: 24px;
+        }
+
+        .control-head h2,
+        .workspace-head h2 {
+            margin: 0;
+            font-size: 1.35rem;
+        }
+
+        .control-head p,
+        .workspace-head p,
+        .section-note,
+        .empty p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .tabs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 22px 0 18px;
+            padding: 8px;
+            background: rgba(31, 26, 23, 0.05);
+            border-radius: 18px;
+        }
+
+        .tab-button {
+            border: none;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            color: var(--muted);
+            background: transparent;
+            transition: all 180ms ease;
+        }
+
+        .tab-button.active {
+            background: var(--panel-strong);
+            color: var(--ink);
+            box-shadow: inset 0 0 0 1px rgba(31, 26, 23, 0.06);
+        }
+
+        .tab-pane {
+            display: none;
+            animation: fadeUp 260ms ease;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        .field input,
+        .field select {
+            width: 100%;
+            border: 1px solid rgba(31, 26, 23, 0.13);
+            background: rgba(255, 255, 255, 0.75);
+            border-radius: 14px;
+            padding: 13px 14px;
+            font-size: 0.96rem;
+            color: var(--ink);
+            outline: none;
+            transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+        }
+
+        .field input:focus,
+        .field select:focus {
+            border-color: rgba(213, 92, 47, 0.55);
+            box-shadow: 0 0 0 4px rgba(213, 92, 47, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .field small {
+            display: block;
+            margin-top: 8px;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .file-drop {
+            position: relative;
+            border: 1.5px dashed rgba(31, 26, 23, 0.18);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.78));
+            padding: 18px;
+            overflow: hidden;
+        }
+
+        .file-drop input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-drop strong {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+
+        .file-drop span {
+            display: block;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .file-list {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(31, 26, 23, 0.07);
+            font-size: 0.86rem;
+            color: var(--ink);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        button,
+        .ghost-link {
+            border: none;
+            border-radius: 999px;
+            padding: 13px 18px;
+            font-size: 0.96rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+        }
+
+        button:hover,
+        .ghost-link:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none;
+        }
+
+        .primary-button {
+            color: #fff7ef;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+            box-shadow: 0 16px 30px rgba(168, 62, 24, 0.26);
+        }
+
+        .secondary-button,
+        .ghost-link {
+            color: var(--ink);
+            background: rgba(31, 26, 23, 0.07);
+        }
+
+        .ghost-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        .status-banner {
+            display: none;
+            margin-bottom: 18px;
+            border-radius: 18px;
+            padding: 14px 16px;
+            font-weight: 700;
+        }
+
+        .status-banner.show {
+            display: block;
+            animation: fadeUp 220ms ease;
+        }
+
+        .status-banner.success {
+            background: var(--green-soft);
+            color: var(--green);
+        }
+
+        .status-banner.error {
+            background: var(--red-soft);
+            color: var(--red);
+        }
+
+        .workspace-head {
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .badge {
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: rgba(31, 26, 23, 0.06);
+            color: var(--muted);
+            font-size: 0.82rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .empty {
+            border-radius: 26px;
+            padding: 36px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.78));
+            border: 1px dashed rgba(31, 26, 23, 0.15);
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .empty strong {
+            font-family: var(--serif);
+            font-size: 2rem;
+            line-height: 1;
             margin-bottom: 10px;
-            border-radius: 4px;
         }
-        .status.success {
-            background-color: #d4edda;
-            color: #155724;
+
+        .result-grid {
+            display: grid;
+            gap: 18px;
         }
-        .status.error {
-            background-color: #f8d7da;
-            color: #721c24;
+
+        .result-card {
+            border-radius: 28px;
+            padding: 22px;
         }
-        table {
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .info-item {
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(31, 26, 23, 0.05);
+        }
+
+        .info-item span {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .info-item strong {
+            font-size: 1rem;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .sequence-panels {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .sequence-box {
+            border-radius: 20px;
+            background: #201915;
+            color: #f7efe5;
+            padding: 16px;
+        }
+
+        .sequence-box h4,
+        .variant-section h4,
+        .image-section h4,
+        .batch-card h4 {
+            margin: 0 0 12px;
+            font-size: 0.96rem;
+        }
+
+        .sequence-box pre,
+        .json-box pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 1.65;
+        }
+
+        .image-frame {
+            margin-top: 16px;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(31, 26, 23, 0.12);
+            background: #fff;
+        }
+
+        .image-frame img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .variant-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .variant-table th,
+        .variant-table td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid rgba(31, 26, 23, 0.08);
+            font-size: 0.92rem;
+        }
+
+        .variant-table th {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+
+        .variant-tag {
+            display: inline-flex;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .variant-tag.mutation {
+            color: #8f2f2f;
+            background: rgba(194, 81, 81, 0.14);
+        }
+
+        .variant-tag.insertion {
+            color: #0b6e46;
+            background: rgba(31, 122, 79, 0.14);
+        }
+
+        .variant-tag.deletion {
+            color: #945508;
+            background: rgba(208, 137, 26, 0.14);
+        }
+
+        .json-box {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 20px;
+            background: rgba(31, 26, 23, 0.06);
+        }
+
+        .batch-summary {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .batch-card {
+            border-radius: 22px;
+            padding: 18px;
+        }
+
+        .batch-card .meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 11px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .status-pill.success {
+            background: var(--green-soft);
+            color: var(--green);
+        }
+
+        .status-pill.failed,
+        .status-pill.error {
+            background: var(--red-soft);
+            color: var(--red);
+        }
+
+        .status-pill.skipped {
+            background: rgba(148, 125, 98, 0.14);
+            color: #7c6754;
+        }
+
+        .batch-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 16px 0 20px;
+        }
+
+        .mini-list {
+            display: grid;
+            gap: 8px;
             margin-top: 10px;
         }
-        h4 {
-            color: #555;
-            margin-top: 15px;
-            margin-bottom: 10px;
+
+        .mini-list span {
+            font-size: 0.88rem;
+            color: var(--muted);
         }
-        .form-group p {
-            margin: 5px 0;
+
+        .mini-list strong {
+            color: var(--ink);
         }
-        select {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
+
+        .batch-image {
+            margin-top: 14px;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid rgba(31, 26, 23, 0.12);
+            background: #fff;
+        }
+
+        .batch-image img {
+            display: block;
             width: 100%;
-            max-width: 300px;
+            height: auto;
+        }
+
+        .footer-note {
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .hero,
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                max-width: none;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .shell {
+                width: min(100% - 20px, 1220px);
+                margin: 14px auto 28px;
+            }
+
+            .hero-card,
+            .panel {
+                padding: 20px;
+                border-radius: 24px;
+            }
+
+            .hero-metrics,
+            .field-grid,
+            .sequence-panels,
+            .batch-summary {
+                grid-template-columns: 1fr;
+            }
+
+            .workspace-head {
+                flex-direction: column;
+            }
+
+            .empty {
+                min-height: 220px;
+                padding: 24px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>基因组比对 - AB1文件分析</h1>
-        
-        <form id="fullSequenceForm">
-            <div class="form-group">
-                <label for="ab1File">选择AB1文件：</label>
-                <input type="file" id="ab1File" name="file" accept=".ab1" required>
-                <p>提示：选择AB1文件进行基因组比对分析。系统会自动从文件名中解析位置信息。</p>
+    <div class="shell">
+        <section class="hero">
+            <article class="hero-card">
+                <div class="hero-label">Sanger Plot Studio</div>
+                <h1>把 AB1 分析做成一个好用的前台工作台。</h1>
+                <p>
+                    这个界面支持单文件精细分析，也支持批量生产式处理。你可以一次上传多个 AB1 文件，
+                    在线查看每个结果摘要、打开生成图片，或者直接打包下载全部 PNG 产物。
+                </p>
+            </article>
+            <div class="hero-metrics">
+                <article class="metric-card">
+                    <span>单文件模式适合定位样本、查看变异、核对序列细节。</span>
+                    <strong>Single</strong>
+                </article>
+                <article class="metric-card">
+                    <span>批量模式适合连续生产，返回汇总结果并支持 ZIP 下载。</span>
+                    <strong>Batch</strong>
+                </article>
+                <article class="metric-card">
+                    <span id="genomeAvailability">正在读取参考基因组配置...</span>
+                    <strong id="genomeCount">--</strong>
+                </article>
+                <article class="metric-card">
+                    <span>所有请求都默认走当前站点 API，不再写死外部地址。</span>
+                    <strong>Local-first</strong>
+                </article>
             </div>
-            
-            <div class="form-group">
-                <label for="genomeVersion">参考基因组版本：</label>
-                <select id="genomeVersion" name="genome_version">
-                    <option value="hg19">hg19 (GRCh37)</option>
-                    <option value="hg38">hg38 (GRCh38)</option>
-                </select>
-                <p>提示：选择参考基因组版本进行比对</p>
-            </div>
-            
-            <div class="form-group">
-                <label for="windowSize">窗口大小（bp）：</label>
-                <input type="number" id="windowSize" name="window_size" value="10" min="1" max="100">
-            </div>
-            
-            <div class="form-group">
-                <label for="chrom">染色体（可选）：</label>
-                <input type="text" id="chrom" name="chrom" placeholder="留空则从BWA比对结果中获取">
-                <p id="chromHint" style="font-size: 12px; color: #666;">留空则从BWA比对结果中自动获取</p>
-            </div>
-            
-            <div class="form-group">
-                <label for="pos">位置（可选）：</label>
-                <input type="number" id="pos" name="pos" placeholder="例如：139409940">
-                <p id="posHint" style="font-size: 12px; color: #666;"></p>
-            </div>
-            
-            <button type="submit">执行比对分析</button>
-        </form>
-        
-        <div id="status" class="status" style="display: none;"></div>
-        
-        <div id="result" class="result" style="display: none;">
-            <h3>比对结果：</h3>
-            
-            <div class="form-group">
-                <h4>基本信息：</h4>
-                <div id="basicInfo"></div>
-            </div>
-            
-            <div class="form-group">
-                <h4>变异信息：</h4>
-                <div id="variantsInfo"></div>
-            </div>
-            
-            <div class="form-group">
-                <h4>峰图：</h4>
-                <div class="image-container">
-                    <img id="sequenceImage" src="" alt="序列峰图" style="display: none;">
+        </section>
+
+        <div class="layout">
+            <aside class="panel">
+                <div class="control-head">
+                    <h2>分析控制台</h2>
+                    <p>先选择模式，再上传样本。单文件走精细查看，批量模式走批量生产与打包下载。</p>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <h4>样本序列：</h4>
-                <div class="json-output" id="sampleSequence"></div>
-            </div>
-            
-            <div class="form-group">
-                <h4>参考序列：</h4>
-                <div class="json-output" id="referenceSequence"></div>
-            </div>
-            
-            <div class="form-group">
-                <h4>完整JSON响应：</h4>
-                <div class="json-output" id="jsonOutput"></div>
-            </div>
+
+                <div class="tabs">
+                    <button class="tab-button active" data-tab="single">单文件分析</button>
+                    <button class="tab-button" data-tab="batch">批量生产</button>
+                </div>
+
+                <div id="statusBanner" class="status-banner"></div>
+
+                <section id="singleTab" class="tab-pane active">
+                    <form id="singleForm">
+                        <div class="field">
+                            <label for="singleFile">AB1 文件</label>
+                            <div class="file-drop">
+                                <strong>点击或拖拽上传单个样本</strong>
+                                <span>支持 `.ab1` 文件，文件名中的坐标会自动尝试解析。</span>
+                                <input type="file" id="singleFile" accept=".ab1" required>
+                            </div>
+                            <div class="file-list" id="singleFileList"></div>
+                        </div>
+
+                        <div class="field">
+                            <label for="singleGenome">参考基因组版本</label>
+                            <select id="singleGenome" name="genome_version"></select>
+                        </div>
+
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="singleWindowSize">窗口大小</label>
+                                <input type="number" id="singleWindowSize" value="10" min="1" max="100">
+                            </div>
+                            <div class="field">
+                                <label for="singlePos">位置</label>
+                                <input type="number" id="singlePos" placeholder="可留空">
+                                <small id="singlePosHint">留空时优先尝试从文件名自动解析。</small>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="singleChrom">染色体</label>
+                            <input type="text" id="singleChrom" placeholder="例如 chr7，可留空">
+                            <small>如果不填，会优先使用 BWA 比对结果。</small>
+                        </div>
+
+                        <div class="actions">
+                            <button type="submit" id="singleSubmit" class="primary-button">开始单文件分析</button>
+                            <button type="button" id="singleReset" class="secondary-button">清空当前表单</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section id="batchTab" class="tab-pane">
+                    <form id="batchForm">
+                        <div class="field">
+                            <label for="batchFiles">批量 AB1 文件</label>
+                            <div class="file-drop">
+                                <strong>一次上传多个样本，进入批量生产流程</strong>
+                                <span>将调用批量接口返回结果汇总，支持继续下载 ZIP 结果包。</span>
+                                <input type="file" id="batchFiles" accept=".ab1" multiple required>
+                            </div>
+                            <div class="file-list" id="batchFileList"></div>
+                        </div>
+
+                        <div class="field">
+                            <label for="batchGenome">参考基因组版本</label>
+                            <select id="batchGenome" name="genome_version"></select>
+                        </div>
+
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="batchWindowSize">窗口大小</label>
+                                <input type="number" id="batchWindowSize" value="10" min="1" max="100">
+                            </div>
+                            <div class="field">
+                                <label for="batchPos">统一位置</label>
+                                <input type="number" id="batchPos" placeholder="可留空">
+                                <small>可选。若填写，将对整批文件使用同一位置。</small>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="batchChrom">统一染色体</label>
+                            <input type="text" id="batchChrom" placeholder="例如 chr7，可留空">
+                            <small>用于整批文件统一指定染色体。</small>
+                        </div>
+
+                        <div class="actions">
+                            <button type="submit" id="batchSubmit" class="primary-button">开始批量生产</button>
+                            <button type="button" id="batchReset" class="secondary-button">清空批量列表</button>
+                        </div>
+                    </form>
+                </section>
+
+                <p class="footer-note">
+                    批量模式完成后，页面会展示成功、失败、跳过统计，并提供“打包下载全部图片”的操作。
+                </p>
+            </aside>
+
+            <main class="panel">
+                <div class="workspace-head">
+                    <div>
+                        <h2>结果工作区</h2>
+                        <p>结果会按模式分别展示。单文件重点看序列和峰图，批量模式重点看生产状态与导出能力。</p>
+                    </div>
+                    <div class="badge" id="workspaceBadge">等待分析任务</div>
+                </div>
+
+                <div id="workspaceEmpty" class="empty">
+                    <strong>Ready.</strong>
+                    <p>上传样本后，这里会生成结构化结果。单文件会展示序列、变异与峰图，批量模式会展示卡片列表和 ZIP 下载操作。</p>
+                </div>
+
+                <div id="singleWorkspace" class="result-grid" style="display:none;"></div>
+                <div id="batchWorkspace" style="display:none;"></div>
+            </main>
         </div>
     </div>
-    
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // 异步加载基因组版本，不阻塞其他操作
-            loadAvailableGenomes().catch(error => {
-                console.error('加载基因组版本失败:', error);
-            });
-            setupFileChangeListener();
+        const apiBase = window.location.origin;
+        let currentSingleImageObjectUrl = null;
+        let currentBatchZipBlobUrl = null;
+        let availableGenomes = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            setupTabs();
+            setupFileBindings();
+            setupForms();
+            loadAvailableGenomes();
         });
-        
-        function setupFileChangeListener() {
-            const fileInput = document.getElementById('ab1File');
-            fileInput.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    parseFilenameAndFillForm(file.name);
-                }
+
+        function setupTabs() {
+            document.querySelectorAll(".tab-button").forEach((button) => {
+                button.addEventListener("click", () => activateTab(button.dataset.tab));
             });
         }
-        
-        function parseFilenameAndFillForm(filename) {
-            const posInput = document.getElementById('pos');
-            const posHint = document.getElementById('posHint');
-            
-            const patterns = [
-            /(chr[\w]+):(\d+)/,          // chr7:140453136 (最高优先级)
-            /(chr[\w]+)-(\d+)/,          // chr7-140453136
-            /(chr[\w]+)_(\d+)/,          // chr7_140453136
-            /(\d+):(\d+)-(\d+)/,         // 7:140453136-140453236
-            /([\w]+):(\d+)-(\d+)/,        // 其他格式
-            /-(\d{4,9})_/,               // -139409940_ (前面有连字符，后面有下划线)
-            /_(\d{4,9})_/,               // _139409940_ (4-9位数字，前后有下划线)
-            /([A-Z0-9]+)_(\d{4,9})_/, //基因名_位置_ (如 NOTCH1_139409940_)
-            /(\w+)-(\d+)-/,               // 基因名-位置- (如 12SrRNA-1095-F) (最低优先级)
-        ];
-            
-            let pos = null;
-            
-            for (const pattern of patterns) {
-                const match = filename.match(pattern);
-                if (match) {
-                    if (match.length === 3) {
-                        pos = parseInt(match[2]);
-                        break;
-                    } else if (match.length === 2) {
-                        pos = parseInt(match[1]);
-                        break;
-                    }
-                }
-            }
-            
-            if (pos) {
-                posInput.value = pos;
-                posHint.textContent = `从文件名解析: ${pos}`;
-            } else {
-                posHint.textContent = '未从文件名解析到位置信息';
-            }
+
+        function activateTab(tabName) {
+            document.querySelectorAll(".tab-button").forEach((button) => {
+                button.classList.toggle("active", button.dataset.tab === tabName);
+            });
+
+            document.getElementById("singleTab").classList.toggle("active", tabName === "single");
+            document.getElementById("batchTab").classList.toggle("active", tabName === "batch");
+            document.getElementById("workspaceBadge").textContent = tabName === "single" ? "单文件工作流" : "批量生产工作流";
         }
-        
+
+        function setupFileBindings() {
+            document.getElementById("singleFile").addEventListener("change", (event) => {
+                const file = event.target.files[0];
+                renderSingleFileChip(file);
+                if (file) {
+                    parseFilenameAndFill(file.name, "singleChrom", "singlePos", "singlePosHint");
+                }
+            });
+
+            document.getElementById("batchFiles").addEventListener("change", (event) => {
+                const files = Array.from(event.target.files || []);
+                renderBatchFileChips(files);
+            });
+        }
+
+        function setupForms() {
+            document.getElementById("singleForm").addEventListener("submit", handleSingleSubmit);
+            document.getElementById("batchForm").addEventListener("submit", handleBatchSubmit);
+
+            document.getElementById("singleReset").addEventListener("click", () => {
+                document.getElementById("singleForm").reset();
+                document.getElementById("singleFileList").innerHTML = "";
+                document.getElementById("singlePosHint").textContent = "留空时优先尝试从文件名自动解析。";
+                clearWorkspace();
+                showStatus("", "");
+            });
+
+            document.getElementById("batchReset").addEventListener("click", () => {
+                document.getElementById("batchForm").reset();
+                document.getElementById("batchFileList").innerHTML = "";
+                clearWorkspace();
+                showStatus("", "");
+                revokeBatchZipUrl();
+            });
+        }
+
         async function loadAvailableGenomes() {
             try {
-                const response = await fetch('http://localhost:8080/');
+                const response = await fetch(`${apiBase}/`);
                 const data = await response.json();
-                
-                const genomeSelect = document.getElementById('genomeVersion');
-                const availableGenomes = data.available_genomes || ['hg19'];
-                
-                genomeSelect.innerHTML = '';
-                
-                const genomeNames = {
-                    'hg19': 'hg19 (GRCh37)',
-                    'hg38': 'hg38 (GRCh38)'
-                };
-                
-                availableGenomes.forEach(genome => {
-                    const option = document.createElement('option');
-                    option.value = genome;
-                    option.textContent = genomeNames[genome] || genome;
-                    genomeSelect.appendChild(option);
-                });
-                
-                if (availableGenomes.length === 0) {
-                    const option = document.createElement('option');
-                    option.value = 'hg19';
-                    option.textContent = 'hg19 (默认)';
-                    genomeSelect.appendChild(option);
-                }
+                availableGenomes = data.available_genomes || [];
+                populateGenomeSelect("singleGenome", availableGenomes);
+                populateGenomeSelect("batchGenome", availableGenomes);
+
+                document.getElementById("genomeCount").textContent = availableGenomes.length || 0;
+                document.getElementById("genomeAvailability").textContent =
+                    availableGenomes.length > 0
+                        ? `已发现 ${availableGenomes.length} 个可用参考版本：${availableGenomes.join(" / ")}`
+                        : "当前没有检测到可用参考基因组，请先挂载参考数据。";
             } catch (error) {
-                console.error('加载基因组版本失败:', error);
+                populateGenomeSelect("singleGenome", ["hg19"]);
+                populateGenomeSelect("batchGenome", ["hg19"]);
+                document.getElementById("genomeCount").textContent = "0";
+                document.getElementById("genomeAvailability").textContent = "读取参考基因组失败，请检查 API 是否正常启动。";
+                showStatus(`加载参考基因组失败：${error.message}`, "error");
             }
         }
-        
-        document.getElementById('fullSequenceForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const file = document.getElementById('ab1File').files[0];
-            const genomeVersion = document.getElementById('genomeVersion').value;
-            const windowSize = document.getElementById('windowSize').value;
-            const chrom = document.getElementById('chrom').value.trim();
-            const pos = document.getElementById('pos').value.trim();
-            
-            console.log('表单提交开始...');
-            console.log('文件:', file ? file.name : '未选择');
-            console.log('基因组版本:', genomeVersion);
-            console.log('窗口大小:', windowSize);
-            console.log('染色体:', chrom);
-            console.log('位置:', pos);
-            
+
+        function populateGenomeSelect(selectId, genomes) {
+            const select = document.getElementById(selectId);
+            const items = genomes.length ? genomes : ["hg19"];
+            const genomeNames = {
+                hg19: "hg19 (GRCh37)",
+                hg38: "hg38 (GRCh38)"
+            };
+
+            select.innerHTML = items
+                .map((genome) => `<option value="${genome}">${genomeNames[genome] || genome}</option>`)
+                .join("");
+        }
+
+        function parseFilenameAndFill(filename, chromId, posId, hintId) {
+            const patterns = [
+                /(chr[\w]+):(\d+)/i,
+                /(chr[\w]+)-(\d+)/i,
+                /(chr[\w]+)_(\d+)/i,
+                /(\d+):(\d+)-(\d+)/,
+                /([\w]+):(\d+)-(\d+)/,
+                /-(\d{4,9})_/,
+                /_(\d{4,9})_/,
+                /([A-Z0-9]+)_(\d{4,9})_/,
+                /(\w+)-(\d+)-/
+            ];
+
+            let chrom = "";
+            let pos = "";
+
+            for (const pattern of patterns) {
+                const match = filename.match(pattern);
+                if (!match) continue;
+
+                if (match.length === 3 && String(match[1]).toLowerCase().startsWith("chr")) {
+                    chrom = match[1];
+                    pos = match[2];
+                    break;
+                }
+
+                if (match.length === 4) {
+                    chrom = String(match[1]).startsWith("chr") ? match[1] : chrom;
+                    pos = String(Math.floor((Number(match[2]) + Number(match[3])) / 2));
+                    break;
+                }
+
+                if (match.length >= 2) {
+                    pos = match[match.length - 1];
+                    break;
+                }
+            }
+
+            if (chrom) {
+                document.getElementById(chromId).value = chrom;
+            }
+            if (pos) {
+                document.getElementById(posId).value = pos;
+            }
+
+            document.getElementById(hintId).textContent = pos
+                ? `已从文件名推断位置：${chrom ? `${chrom}:` : ""}${pos}`
+                : "没有从文件名中解析到明确坐标，提交后将由后端继续判定。";
+        }
+
+        function renderSingleFileChip(file) {
+            const list = document.getElementById("singleFileList");
+            list.innerHTML = file ? `<span class="chip">${escapeHtml(file.name)}</span>` : "";
+        }
+
+        function renderBatchFileChips(files) {
+            const list = document.getElementById("batchFileList");
+            list.innerHTML = files
+                .map((file) => `<span class="chip">${escapeHtml(file.name)}</span>`)
+                .join("");
+        }
+
+        async function handleSingleSubmit(event) {
+            event.preventDefault();
+            const file = document.getElementById("singleFile").files[0];
             if (!file) {
-                alert('请选择AB1文件');
+                showStatus("请先选择一个 AB1 文件。", "error");
                 return;
             }
-            
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = '正在处理，请稍候...';
-            statusDiv.className = 'status success';
-            statusDiv.style.display = 'block';
-            
-            document.getElementById('result').style.display = 'none';
-            
+
+            setLoading("singleSubmit", true, "正在分析...");
+            showStatus("正在执行单文件分析，请稍候。", "success");
+            activateTab("single");
+
             try {
-                console.log('创建FormData对象...');
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('genome_version', genomeVersion);
-                formData.append('window_size', windowSize);
-                if (chrom) formData.append('chrom', chrom);
-                if (pos) formData.append('pos', pos);
-                
-                console.log('发送JSON请求...');
-                console.log('参数: file=', file.name, ', genome_version=', genomeVersion, ', window_size=', windowSize, ', chrom=', chrom || '(未指定，使用bwa结果)', ', pos=', pos || '(从文件名解析)');
-                const jsonResponse = await fetch('http://120.237.96.3:8000/api/align/json', {
-                    method: 'POST',
-                    body: formData
+                const detailFormData = new FormData();
+                appendCommonSingleFields(detailFormData, file);
+                const detailResponse = await fetch(`${apiBase}/api/align/json`, {
+                    method: "POST",
+                    body: detailFormData
                 });
-                
-                console.log('JSON响应状态:', jsonResponse.status);
-                
-                if (!jsonResponse.ok) {
-                    const jsonError = await jsonResponse.text();
-                    throw new Error(`JSON请求失败 (${jsonResponse.status}): ${jsonError}`);
-                }
-                
-                console.log('解析JSON响应...');
-                const jsonData = await jsonResponse.json();
-                console.log('JSON数据:', jsonData);
-                
-                console.log('重新创建FormData对象发送图片请求...');
-                const formData2 = new FormData();
-                formData2.append('file', file);
-                formData2.append('genome_version', genomeVersion);
-                formData2.append('window_size', windowSize);
-                if (chrom) formData2.append('chrom', chrom);
-                if (pos) formData2.append('pos', pos);
-                
-                console.log('发送图片请求...');
-                const imageResponse = await fetch('http://120.237.96.3:8000/api/align', {
-                    method: 'POST',
-                    body: formData2
+
+                const detailPayload = await parseJsonResponse(detailResponse);
+
+                const imageFormData = new FormData();
+                appendCommonSingleFields(imageFormData, file);
+                const imageResponse = await fetch(`${apiBase}/api/align`, {
+                    method: "POST",
+                    body: imageFormData
                 });
-                
-                console.log('图片响应状态:', imageResponse.status);
-                
+
                 if (!imageResponse.ok) {
-                    const imageError = await imageResponse.text();
-                    throw new Error(`图片请求失败 (${imageResponse.status}): ${imageError}`);
+                    throw new Error(await imageResponse.text());
                 }
-                
-                console.log('解析图片响应...');
+
                 const imageBlob = await imageResponse.blob();
-                console.log('图片大小:', imageBlob.size, 'bytes');
-                const imageUrl = URL.createObjectURL(imageBlob);
-                
-                console.log('显示结果...');
-                statusDiv.textContent = '处理成功！';
-                statusDiv.className = 'status success';
-                
-                displayResults(jsonData, imageUrl);
-                document.getElementById('result').style.display = 'block';
-                
+                if (currentSingleImageObjectUrl) {
+                    URL.revokeObjectURL(currentSingleImageObjectUrl);
+                }
+                currentSingleImageObjectUrl = URL.createObjectURL(imageBlob);
+
+                renderSingleWorkspace(detailPayload, currentSingleImageObjectUrl);
+                showStatus("单文件分析完成。", "success");
             } catch (error) {
-                console.error('错误详情:', error);
-                statusDiv.textContent = '错误: ' + error.message;
-                statusDiv.className = 'status error';
+                clearWorkspace();
+                showStatus(`单文件分析失败：${error.message}`, "error");
+            } finally {
+                setLoading("singleSubmit", false, "开始单文件分析");
             }
-        });
-        
-        function displayResults(data, imageUrl) {
-            console.log('displayResults开始...');
-            console.log('数据:', data);
-            console.log('图片URL:', imageUrl);
-            
-            const basicInfo = document.getElementById('basicInfo');
-            const variantsInfo = document.getElementById('variantsInfo');
-            const sampleSequence = document.getElementById('sampleSequence');
-            const referenceSequence = document.getElementById('referenceSequence');
-            const jsonOutput = document.getElementById('jsonOutput');
-            const sequenceImage = document.getElementById('sequenceImage');
-            
+        }
+
+        function appendCommonSingleFields(formData, file) {
+            formData.append("file", file);
+            formData.append("genome_version", document.getElementById("singleGenome").value);
+            formData.append("window_size", document.getElementById("singleWindowSize").value);
+
+            const chrom = document.getElementById("singleChrom").value.trim();
+            const pos = document.getElementById("singlePos").value.trim();
+            if (chrom) formData.append("chrom", chrom);
+            if (pos) formData.append("pos", pos);
+        }
+
+        async function handleBatchSubmit(event) {
+            event.preventDefault();
+            const files = Array.from(document.getElementById("batchFiles").files || []);
+            if (files.length === 0) {
+                showStatus("请至少选择一个 AB1 文件。", "error");
+                return;
+            }
+
+            setLoading("batchSubmit", true, "批量处理中...");
+            showStatus(`正在批量生产，共 ${files.length} 个文件。`, "success");
+            activateTab("batch");
+            revokeBatchZipUrl();
+
             try {
-                basicInfo.innerHTML = `
-                    <p><strong>文件名：</strong> ${data.filename || 'N/A'}</p>
-                    <p><strong>染色体：</strong> ${data.chrom || 'N/A'}</p>
-                    <p><strong>位置：</strong> ${data.pos || 'N/A'}</p>
-                    <p><strong>窗口大小：</strong> ${data.window_size || 'N/A'} bp</p>
-                    <p><strong>比对质量：</strong> ${data.alignment_score ? data.alignment_score.toFixed(2) + '%' : 'N/A'}</p>
-                    <p><strong>CIGAR：</strong> ${data.cigar || 'N/A'}</p>
-                    <p><strong>MAPQ：</strong> ${data.mapq || 'N/A'}</p>
-                    <p><strong>样本序列长度：</strong> ${data.sample_length || (data.sample_sequence ? data.sample_sequence.length : 'N/A')}</p>
-                    <p><strong>参考序列长度：</strong> ${data.reference_length || (data.reference_sequence ? data.reference_sequence.length : 'N/A')}</p>
-                `;
-                
-                if (data.variants && data.variants.length > 0) {
-                    let variantsHtml = '<table style="width: 100%; border-collapse: collapse;">';
-                    variantsHtml += '<tr style="background-color: #f0f0f0;"><th style="border: 1px solid #ddd; padding: 8px;">位置</th><th style="border: 1px solid #ddd; padding: 8px;">类型</th><th style="border: 1px solid #ddd; padding: 8px;">参考</th><th style="border: 1px solid #ddd; padding: 8px;">变异</th></tr>';
-                    
-                    data.variants.forEach(variant => {
-                        const [pos, type, ref, alt] = variant;
-                        const typeColors = {
-                            'mutation': '#ff6b6b',
-                            'deletion': '#ffa502',
-                            'insertion': '#2ed573'
-                        };
-                        const color = typeColors[type] || '#333';
-                        
-                        variantsHtml += `
-                            <tr>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${pos}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px; color: ${color}; font-weight: bold;">${type}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${ref}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px; color: ${color}; font-weight: bold;">${alt}</td>
-                            </tr>
-                        `;
+                const summaryFormData = buildBatchFormData(files, true);
+                const summaryResponse = await fetch(`${apiBase}/api/align/batch`, {
+                    method: "POST",
+                    body: summaryFormData
+                });
+                const batchPayload = await parseJsonResponse(summaryResponse);
+
+                let zipUrl = "";
+                const successfulCount = (batchPayload.results || []).filter((item) => item.status === "success").length;
+                if (successfulCount > 0) {
+                    const zipFormData = buildBatchFormData(files, false);
+                    const zipResponse = await fetch(`${apiBase}/api/align/batch`, {
+                        method: "POST",
+                        body: zipFormData
                     });
-                    
-                    variantsHtml += '</table>';
-                    variantsHtml += `<p><strong>共发现 ${data.variants.length} 个变异</strong></p>`;
-                    variantsInfo.innerHTML = variantsHtml;
-                } else {
-                    variantsInfo.innerHTML = '<p>未发现变异</p>';
+
+                    if (zipResponse.ok) {
+                        const zipBlob = await zipResponse.blob();
+                        currentBatchZipBlobUrl = URL.createObjectURL(zipBlob);
+                        zipUrl = currentBatchZipBlobUrl;
+                    }
                 }
-                
-                sampleSequence.textContent = data.sample_sequence || 'N/A';
-                referenceSequence.textContent = data.reference_sequence || 'N/A';
-                jsonOutput.textContent = JSON.stringify(data, null, 2);
-                
-                if (imageUrl) {
-                    sequenceImage.src = imageUrl;
-                    sequenceImage.style.display = 'block';
-                }
-                
-                console.log('displayResults完成');
+
+                renderBatchWorkspace(batchPayload, zipUrl);
+                showStatus(`批量处理完成：成功 ${batchPayload.successful}，失败 ${batchPayload.failed}，跳过 ${batchPayload.skipped}。`, "success");
             } catch (error) {
-                console.error('displayResults错误:', error);
-                basicInfo.innerHTML = `<p style="color: red;">显示结果时出错: ${error.message}</p>`;
+                clearWorkspace();
+                showStatus(`批量处理失败：${error.message}`, "error");
+            } finally {
+                setLoading("batchSubmit", false, "开始批量生产");
             }
+        }
+
+        function buildBatchFormData(files, returnJson) {
+            const formData = new FormData();
+            files.forEach((file) => formData.append("files", file));
+            formData.append("genome_version", document.getElementById("batchGenome").value);
+            formData.append("window_size", document.getElementById("batchWindowSize").value);
+            formData.append("return_json", String(returnJson));
+
+            const chrom = document.getElementById("batchChrom").value.trim();
+            const pos = document.getElementById("batchPos").value.trim();
+            if (chrom) formData.append("chrom", chrom);
+            if (pos) formData.append("pos", pos);
+            return formData;
+        }
+
+        async function parseJsonResponse(response) {
+            if (!response.ok) {
+                throw new Error(await response.text());
+            }
+            return response.json();
+        }
+
+        function renderSingleWorkspace(data, imageUrl) {
+            document.getElementById("workspaceEmpty").style.display = "none";
+            document.getElementById("batchWorkspace").style.display = "none";
+
+            const variantRows = (data.variants || []).map(([position, type, ref, alt]) => `
+                <tr>
+                    <td>${position}</td>
+                    <td><span class="variant-tag ${escapeHtml(type)}">${escapeHtml(type)}</span></td>
+                    <td>${escapeHtml(String(ref))}</td>
+                    <td>${escapeHtml(String(alt))}</td>
+                </tr>
+            `).join("");
+
+            const singleWorkspace = document.getElementById("singleWorkspace");
+            singleWorkspace.style.display = "grid";
+            singleWorkspace.innerHTML = `
+                <article class="result-card">
+                    <div class="workspace-head" style="margin-bottom: 8px;">
+                        <div>
+                            <h2>${escapeHtml(data.filename || "未命名样本")}</h2>
+                            <p>已完成单文件分析，可以继续查看峰图、序列与变异细节。</p>
+                        </div>
+                        <div class="badge">Single Result</div>
+                    </div>
+
+                    <div class="info-grid">
+                        ${infoItem("染色体", data.chrom || "N/A")}
+                        ${infoItem("位置", data.pos || "N/A")}
+                        ${infoItem("窗口", `${data.window_size || "N/A"} bp`)}
+                        ${infoItem("比对得分", data.alignment_score ? `${Number(data.alignment_score).toFixed(2)}%` : "N/A")}
+                        ${infoItem("CIGAR", data.cigar || "N/A")}
+                        ${infoItem("MAPQ", data.mapq || "N/A")}
+                        ${infoItem("样本长度", data.sample_length || (data.sample_sequence ? data.sample_sequence.length : "N/A"))}
+                        ${infoItem("参考长度", data.reference_length || (data.reference_sequence ? data.reference_sequence.length : "N/A"))}
+                    </div>
+
+                    <section class="image-section">
+                        <h4>峰图结果</h4>
+                        <div class="image-frame">
+                            <img src="${imageUrl}" alt="单文件分析峰图">
+                        </div>
+                    </section>
+
+                    <section class="variant-section" style="margin-top: 18px;">
+                        <h4>变异信息</h4>
+                        ${
+                            variantRows
+                                ? `<table class="variant-table">
+                                        <thead>
+                                            <tr>
+                                                <th>位置</th>
+                                                <th>类型</th>
+                                                <th>参考</th>
+                                                <th>变异</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${variantRows}</tbody>
+                                   </table>`
+                                : `<div class="info-item"><strong>未检测到显著变异</strong></div>`
+                        }
+                    </section>
+
+                    <div class="sequence-panels">
+                        <section class="sequence-box">
+                            <h4>样本序列</h4>
+                            <pre>${escapeHtml(data.sample_sequence || "N/A")}</pre>
+                        </section>
+                        <section class="sequence-box">
+                            <h4>参考序列</h4>
+                            <pre>${escapeHtml(data.reference_sequence || "N/A")}</pre>
+                        </section>
+                    </div>
+
+                    <section class="json-box">
+                        <h4 style="margin-top:0;">原始 JSON</h4>
+                        <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+                    </section>
+                </article>
+            `;
+        }
+
+        function renderBatchWorkspace(data, zipUrl) {
+            document.getElementById("workspaceEmpty").style.display = "none";
+            document.getElementById("singleWorkspace").style.display = "none";
+
+            const batchWorkspace = document.getElementById("batchWorkspace");
+            batchWorkspace.style.display = "block";
+
+            const cards = (data.results || []).map((item) => {
+                const variantCount = Array.isArray(item.variants) ? item.variants.length : 0;
+                const imageBlock = item.image_url
+                    ? `<div class="batch-image"><img src="${item.image_url}" alt="${escapeHtml(item.filename || "batch result")}"></div>`
+                    : "";
+
+                const actions = item.image_url
+                    ? `<div class="batch-actions">
+                            <a class="ghost-link" href="${item.image_url}" target="_blank" rel="noopener noreferrer">查看图片</a>
+                            <a class="ghost-link" href="${item.image_url}" download>下载图片</a>
+                       </div>`
+                    : "";
+
+                const errorLine = item.error
+                    ? `<div class="info-item" style="margin-top:12px;"><span>错误信息</span><strong>${escapeHtml(item.error)}</strong></div>`
+                    : "";
+
+                return `
+                    <article class="batch-card">
+                        <div class="meta">
+                            <h4>${escapeHtml(item.filename || "未命名文件")}</h4>
+                            <span class="status-pill ${escapeHtml(item.status || "error")}">${escapeHtml(item.status || "unknown")}</span>
+                        </div>
+                        <div class="mini-list">
+                            <span><strong>坐标:</strong> ${escapeHtml(item.chrom || "N/A")} : ${escapeHtml(String(item.pos || "N/A"))}</span>
+                            <span><strong>比对得分:</strong> ${item.alignment_score ? `${Number(item.alignment_score).toFixed(2)}%` : "N/A"}</span>
+                            <span><strong>变异数量:</strong> ${variantCount}</span>
+                            <span><strong>CIGAR:</strong> ${escapeHtml(item.cigar || "N/A")}</span>
+                        </div>
+                        ${actions}
+                        ${imageBlock}
+                        ${errorLine}
+                    </article>
+                `;
+            }).join("");
+
+            batchWorkspace.innerHTML = `
+                <section class="result-card">
+                    <div class="workspace-head" style="margin-bottom: 8px;">
+                        <div>
+                            <h2>批量生产结果</h2>
+                            <p>这次任务共处理 ${data.total_files || 0} 个文件，下面按样本逐项展示执行结果。</p>
+                        </div>
+                        <div class="badge">Batch Summary</div>
+                    </div>
+
+                    <div class="batch-summary">
+                        ${infoItem("总文件数", data.total_files || 0)}
+                        ${infoItem("成功", data.successful || 0)}
+                        ${infoItem("失败", data.failed || 0)}
+                        ${infoItem("跳过", data.skipped || 0)}
+                    </div>
+
+                    <div class="batch-actions">
+                        ${zipUrl ? `<a class="ghost-link" href="${zipUrl}" download="alignment_results.zip">打包下载全部图片</a>` : ""}
+                        <button type="button" class="secondary-button" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })">返回顶部继续处理</button>
+                    </div>
+
+                    <div class="result-grid">
+                        ${cards || `<div class="info-item"><strong>没有可展示的批量结果。</strong></div>`}
+                    </div>
+
+                    <section class="json-box">
+                        <h4 style="margin-top:0;">批量原始 JSON</h4>
+                        <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+                    </section>
+                </section>
+            `;
+        }
+
+        function infoItem(label, value) {
+            return `
+                <div class="info-item">
+                    <span>${escapeHtml(String(label))}</span>
+                    <strong>${escapeHtml(String(value))}</strong>
+                </div>
+            `;
+        }
+
+        function setLoading(buttonId, loading, text) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+            button.disabled = loading;
+            button.textContent = text;
+        }
+
+        function clearWorkspace() {
+            document.getElementById("singleWorkspace").style.display = "none";
+            document.getElementById("batchWorkspace").style.display = "none";
+            document.getElementById("singleWorkspace").innerHTML = "";
+            document.getElementById("batchWorkspace").innerHTML = "";
+            document.getElementById("workspaceEmpty").style.display = "flex";
+
+            if (currentSingleImageObjectUrl) {
+                URL.revokeObjectURL(currentSingleImageObjectUrl);
+                currentSingleImageObjectUrl = null;
+            }
+        }
+
+        function revokeBatchZipUrl() {
+            if (currentBatchZipBlobUrl) {
+                URL.revokeObjectURL(currentBatchZipBlobUrl);
+                currentBatchZipBlobUrl = null;
+            }
+        }
+
+        function showStatus(message, type) {
+            const banner = document.getElementById("statusBanner");
+            if (!message) {
+                banner.textContent = "";
+                banner.className = "status-banner";
+                return;
+            }
+            banner.textContent = message;
+            banner.className = `status-banner show ${type}`;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
         }
     </script>
 </body>

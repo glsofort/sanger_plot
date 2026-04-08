@@ -17,6 +17,9 @@ from Bio import SeqIO
 import tempfile
 import shutil
 
+DEFAULT_REF_FILE = os.getenv("DEFAULT_REF_FILE", "/data/reference/hg19/hs37d5.fa")
+GET_REFERENCE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "get_reference.py")
+
 
 def parse_position_from_filename(filename):
     """
@@ -58,7 +61,7 @@ def get_reference_sequence(chrom, pos, window_size=50, ref_file=None):
     # 尝试从get_reference.py获取参考序列
     if ref_file is None:
         # 使用默认参考文件路径
-        ref_file = '/home/df/test/hg19/hs37d5.fa'
+        ref_file = DEFAULT_REF_FILE
     
     if not os.path.exists(ref_file):
         print(f"错误: 参考文件 {ref_file} 不存在")
@@ -71,7 +74,7 @@ def get_reference_sequence(chrom, pos, window_size=50, ref_file=None):
     
     try:
         result = subprocess.run(
-            ['python3', 'get_reference.py', ref_file, chrom, str(max(1, start)), str(end)],
+            [sys.executable, GET_REFERENCE_SCRIPT, ref_file, chrom, str(max(1, start)), str(end)],
             capture_output=True,
             text=True,
             check=True
@@ -265,7 +268,7 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     
     # 设置默认参考基因组文件路径
     if ref_file is None:
-        ref_file = '/home/df/test/hg19/hs37d5.fa'
+        ref_file = DEFAULT_REF_FILE
     
     print(f"使用参考基因组: {ref_file}")
     
@@ -358,7 +361,7 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     print(f"获取参考序列: {ref_chrom}:{ref_start_1based}-{ref_end_1based}")
     try:
         result = subprocess.run(
-            ['python3', 'get_reference.py', ref_file, ref_chrom, str(ref_start_1based), str(ref_end_1based)],
+            [sys.executable, GET_REFERENCE_SCRIPT, ref_file, ref_chrom, str(ref_start_1based), str(ref_end_1based)],
             capture_output=True,
             text=True,
             check=True

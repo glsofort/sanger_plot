@@ -4,21 +4,17 @@ FastAPI应用 - 基因组比对API
 提供AB1文件与参考基因组比对的REST API接口
 """
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
 import os
 import tempfile
 import shutil
 from datetime import datetime
-import json
 
 from plot_genome_alignment import (
-    parse_position_from_filename,
-    get_reference_sequence,
-    align_with_bwa,
-    calculate_target_index,
     plot_genome_alignment
 )
 
@@ -37,16 +33,17 @@ app.add_middleware(
 )
 
 # 临时文件目录
-TEMP_DIR = tempfile.mkdtemp(prefix="genome_api_")
-OUTPUT_DIR = tempfile.mkdtemp(prefix="genome_output_")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMP_DIR = os.getenv("TEMP_DIR", tempfile.mkdtemp(prefix="genome_api_"))
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(BASE_DIR, "outputs"))
 
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # 参考基因组文件路径
 GENOME_VERSIONS = {
-    "hg19": "/mnt/storage/bioinformatics-data/kian/hg19/hs37d5.fa",
-    "hg38": "//mnt/storage/bioinformatics-data/kian/hg38/hg38.fa"
+    "hg19": os.getenv("HG19_REF_FILE", "/data/reference/hg19/hs37d5.fa"),
+    "hg38": os.getenv("HG38_REF_FILE", "/data/reference/hg38/hg38.fa")
 }
 
 # 验证基因组文件是否存在
@@ -54,6 +51,8 @@ AVAILABLE_GENOMES = {}
 for version, path in GENOME_VERSIONS.items():
     if os.path.exists(path):
         AVAILABLE_GENOMES[version] = path
+
+app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
 
 
 @app.get("/")
@@ -84,11 +83,16 @@ async def get_full_sequence_page():
 @app.get("/api/health")
 async def health_check():
     """健康检查"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "available_genomes": list(AVAILABLE_GENOMES.keys())
+    }
 
 
 @app.post("/api/align")
 async def align_single_file(
+    request: Request,
     file: UploadFile = File(...),
     genome_version: str = Form("hg19"),
     window_size: int = Form(10),
@@ -147,6 +151,7 @@ async def align_single_file(
                 "status": "success",
                 "filename": file.filename,
                 "output_file": output_filename,
+                "image_url": str(request.url_for("outputs", path=output_filename)),
                 "chrom": result.get("chrom"),
                 "pos": result.get("pos"),
                 "window_size": window_size,
@@ -162,12 +167,15 @@ async def align_single_file(
                 filename=output_filename
             )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
 
 
 @app.post("/api/align/batch")
 async def align_batch_files(
+    request: Request,
     files: List[UploadFile] = File(...),
     genome_version: str = Form("hg19"),
     window_size: int = Form(10),
@@ -252,7 +260,7 @@ async def align_batch_files(
                 if result:
                     file_result["status"] = "success"
                     file_result["output_file"] = output_filename
-                    file_result["image_url"] = f"http://localhost:8080/outputs/{output_filename}"
+                    file_result["image_url"] = str(request.url_for("outputs", path=output_filename))
                     file_result["chrom"] = result.get("chrom")
                     file_result["pos"] = result.get("pos")
                     file_result["sample_sequence"] = result.get("sample_sequence")
@@ -317,6 +325,8 @@ async def align_batch_files(
                 }
             )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量处理失败: {str(e)}")
 
@@ -384,7 +394,9 @@ async def align_to_json(
             "mapq": result.get("mapq"),
             "timestamp": datetime.now().isoformat()
         })
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
 
