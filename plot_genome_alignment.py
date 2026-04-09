@@ -19,6 +19,9 @@ import shutil
 
 DEFAULT_REF_FILE = os.getenv("DEFAULT_REF_FILE", "/data/reference/hg19/hs37d5.fa")
 GET_REFERENCE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "get_reference.py")
+BASE_FONT_FAMILY = "DejaVu Sans Mono"
+BASE_FONT_SIZE = 15
+LABEL_FONT_SIZE = 13
 
 
 def parse_position_from_filename(filename):
@@ -560,8 +563,9 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
         color = BASE_COLORS.get(base, '#808080')
         
         # 绘制彩色碱基
-        ax_seq.text(base_loc, 1.5, base, ha='center', va='center', 
-                  color=color, fontsize=12, fontweight='bold')
+        ax_seq.text(base_loc, 1.5, base, ha='center', va='center',
+                  color=color, fontsize=BASE_FONT_SIZE, fontweight='bold',
+                  fontfamily=BASE_FONT_FAMILY)
     
     # 添加文件名称标签
     file_name = os.path.basename(ab1_file)
@@ -574,8 +578,9 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     else:
         # 如果没有匹配到，使用文件名去掉扩展名
         sample_name = os.path.splitext(file_name)[0]
-    ax_seq.text(display_base_locs[0] - 20, 1.5, sample_name, ha='right', va='center', 
-              fontsize=12, fontweight='bold', color='#333333')
+    ax_seq.text(display_base_locs[0] - 20, 1.5, sample_name, ha='right', va='center',
+              fontsize=LABEL_FONT_SIZE, fontweight='bold', color='#333333',
+              fontfamily=BASE_FONT_FAMILY)
     
     # 下方：参考序列显示
     ax_ref.set_ylim(0, 2)
@@ -681,12 +686,14 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
         color = BASE_COLORS.get(base, '#808080')
         
         # 绘制彩色碱基
-        ax_ref.text(base_loc, 1.5, base, ha='center', va='center', 
-                  color=color, fontsize=12, fontweight='bold')
+        ax_ref.text(base_loc, 1.5, base, ha='center', va='center',
+                  color=color, fontsize=BASE_FONT_SIZE, fontweight='bold',
+                  fontfamily=BASE_FONT_FAMILY)
     
     # 添加参考序列标签
-    ax_ref.text(display_base_locs[0] - 20, 1.5, 'Reference:', ha='right', va='center', 
-              fontsize=12, fontweight='bold', color='#333333')
+    ax_ref.text(display_base_locs[0] - 20, 1.5, 'Reference:', ha='right', va='center',
+              fontsize=LABEL_FONT_SIZE, fontweight='bold', color='#333333',
+              fontfamily=BASE_FONT_FAMILY)
     
     # 下方：峰图显示
     x = np.arange(x_start, x_end)
