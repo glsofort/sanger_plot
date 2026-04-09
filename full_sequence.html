@@ -78,7 +78,6 @@
         .site-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
             margin-bottom: 14px;
             padding: 0 4px;
         }
@@ -86,18 +85,58 @@
         .site-title {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             color: var(--muted);
-            font-size: 0.82rem;
-            letter-spacing: 0.22em;
-            text-transform: uppercase;
+        }
+
+        .site-logo {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 12px;
+            flex: 0 0 auto;
+        }
+
+        .site-title-text {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .site-title strong {
             color: var(--ink);
-            font-size: 0.95rem;
-            letter-spacing: 0.16em;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
             font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .site-title span {
+            color: var(--muted);
+            font-size: 0.9rem;
+            letter-spacing: 0.02em;
+        }
+
+        @media (max-width: 760px) {
+            .site-logo {
+                width: 36px;
+                height: 36px;
+            }
+
+            .site-title-text {
+                gap: 6px;
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .site-title strong {
+                font-size: 0.92rem;
+            }
+
+            .site-title span {
+                font-size: 0.82rem;
+            }
         }
 
         .layout {
@@ -687,7 +726,13 @@
         </section>
 
         <div class="site-header">
-            <div class="site-title"><strong>GLSanger Plot Studio</strong></div>
+            <div class="site-title">
+                <img class="site-logo" src="/assets/logo.png" alt="GLSanger logo">
+                <div class="site-title-text">
+                    <strong>GLSanger Plot Studio</strong>
+                    <span>Sanger测序截图工具</span>
+                </div>
+            </div>
         </div>
 
         <div class="layout">

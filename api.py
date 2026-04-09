@@ -36,9 +36,11 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMP_DIR = os.getenv("TEMP_DIR", tempfile.mkdtemp(prefix="genome_api_"))
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(BASE_DIR, "outputs"))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(ASSETS_DIR, exist_ok=True)
 
 # 参考基因组文件路径
 GENOME_VERSIONS = {
@@ -53,6 +55,7 @@ for version, path in GENOME_VERSIONS.items():
         AVAILABLE_GENOMES[version] = path
 
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
 
 @app.get("/")
