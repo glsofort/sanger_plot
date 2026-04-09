@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sanger Plot Studio</title>
+    <title>GLSanger Plot Studio</title>
     <style>
         :root {
             --bg: #f6f0e8;
@@ -57,22 +57,12 @@
 
         .shell {
             width: min(1220px, calc(100% - 32px));
-            margin: 28px auto 48px;
+            margin: 18px auto 36px;
             position: relative;
             z-index: 1;
         }
 
-        .hero {
-            display: grid;
-            grid-template-columns: 1.15fr 0.85fr;
-            gap: 22px;
-            align-items: stretch;
-            margin-bottom: 24px;
-        }
-
-        .hero-card,
         .panel,
-        .metric-card,
         .result-card,
         .batch-card {
             background: var(--panel);
@@ -81,79 +71,33 @@
             box-shadow: var(--shadow);
         }
 
-        .hero-card {
-            border-radius: 32px;
-            padding: 30px 32px;
-            position: relative;
-            overflow: hidden;
+        .hero {
+            display: none !important;
         }
 
-        .hero-card::after {
-            content: "";
-            position: absolute;
-            right: -42px;
-            top: -42px;
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(213, 92, 47, 0.24), transparent 70%);
+        .site-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding: 0 4px;
         }
 
-        .hero-label {
+        .site-title {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(31, 26, 23, 0.06);
             color: var(--muted);
-            font-size: 12px;
-            letter-spacing: 0.18em;
+            font-size: 0.82rem;
+            letter-spacing: 0.22em;
             text-transform: uppercase;
         }
 
-        .hero h1 {
-            margin: 18px 0 14px;
-            font-family: var(--serif);
-            font-size: clamp(2.6rem, 4vw, 4.4rem);
-            line-height: 0.95;
+        .site-title strong {
+            color: var(--ink);
+            font-size: 0.95rem;
+            letter-spacing: 0.16em;
             font-weight: 700;
-            max-width: 10ch;
-        }
-
-        .hero p {
-            margin: 0;
-            max-width: 56ch;
-            color: var(--muted);
-            font-size: 1rem;
-            line-height: 1.7;
-        }
-
-        .hero-metrics {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 16px;
-            align-self: stretch;
-        }
-
-        .metric-card {
-            border-radius: 26px;
-            padding: 22px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            min-height: 170px;
-        }
-
-        .metric-card strong {
-            font-family: var(--serif);
-            font-size: 2.2rem;
-            font-weight: 700;
-        }
-
-        .metric-card span {
-            color: var(--muted);
-            line-height: 1.6;
         }
 
         .layout {
@@ -659,29 +603,22 @@
         }
 
         @media (max-width: 1100px) {
-            .hero,
             .layout {
                 grid-template-columns: 1fr;
-            }
-
-            .hero h1 {
-                max-width: none;
             }
         }
 
         @media (max-width: 760px) {
             .shell {
                 width: min(100% - 20px, 1220px);
-                margin: 14px auto 28px;
+                margin: 12px auto 24px;
             }
 
-            .hero-card,
             .panel {
-                padding: 20px;
+                padding: 18px;
                 border-radius: 24px;
             }
 
-            .hero-metrics,
             .field-grid,
             .sequence-panels,
             .batch-summary {
@@ -703,7 +640,7 @@
     <div class="shell">
         <section class="hero">
             <article class="hero-card">
-                <div class="hero-label">Sanger Plot Studio</div>
+                <div class="hero-label">GLSanger Plot Studio</div>
                 <h1>把 AB1 分析做成一个好用的前台工作台。</h1>
                 <p>
                     这个界面支持单文件精细分析，也支持批量生产式处理。你可以一次上传多个 AB1 文件，
@@ -729,6 +666,10 @@
                 </article>
             </div>
         </section>
+
+        <div class="site-header">
+            <div class="site-title"><strong>GLSanger Plot Studio</strong></div>
+        </div>
 
         <div class="layout">
             <aside class="panel">
