@@ -217,16 +217,6 @@ def calculate_target_index(bwa_pos, target_pos, cigar, sample_seq, ref_seq):
                     end = min(len(sample_seq), target_idx + 11)
                     print(f"目标位置周围的碱基: {sample_seq[start:end]}")
                     print(f"目标位置周围的碱基索引: {start} to {end-1}")
-                    # 检查是否是CCTCC中的T
-                    if "CCTCC" in sample_seq[start:end]:
-                        cctcc_pos = sample_seq[start:end].index("CCTCC")
-                        t_pos_in_cctcc = cctcc_pos + 2  # CCTCC中的第三个碱基是T
-                        actual_t_idx = start + t_pos_in_cctcc
-                        print(f"CCTCC在周围序列中的位置: {cctcc_pos}")
-                        print(f"CCTCC中的T的索引: {actual_t_idx}")
-                        print(f"CCTCC中的T的碱基: {sample_seq[actual_t_idx]}")
-                        # 确保返回CCTCC中的T的索引
-                        return actual_t_idx
                     return target_idx
                 ref_pos += length
                 sample_pos += length
