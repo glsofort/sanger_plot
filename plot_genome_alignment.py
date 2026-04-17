@@ -243,8 +243,64 @@ def calculate_target_index(bwa_pos, target_pos, cigar, sample_seq, ref_seq):
         return None
 
 
+def detect_heterozygous(traces, base_locs, base_idx, sample_base):
+    """
+    检测指定位置是否为杂合
+    
+    参数:
+        traces: 峰图数据字典 {'A': array, 'T': array, 'C': array, 'G': array}
+        base_locs: 碱基位置数组
+        base_idx: 碱基索引
+        sample_base: 样本碱基
+    
+    返回:
+        dict: {
+            'is_heterozygous': bool,
+            'secondary_base': str,  # 次峰碱基
+            'secondary_ratio': float,  # 次峰比例
+            'peak_heights': dict  # 各碱基峰高
+        }
+    """
+    try:
+        loc = base_locs[base_idx]
+        window = 3
+        
+        peak_heights = {}
+        for nt in ['A', 'T', 'C', 'G']:
+            trace = traces[nt]
+            region = trace[max(0, loc-window):min(len(trace), loc+window+1)]
+            peak_heights[nt] = float(np.max(region))
+        
+        sorted_peaks = sorted(peak_heights.items(), key=lambda x: x[1], reverse=True)
+        primary = sorted_peaks[0]
+        secondary = sorted_peaks[1]
+        
+        if primary[1] > 0:
+            secondary_ratio = secondary[1] / primary[1]
+        else:
+            secondary_ratio = 0.0
+        
+        is_heterozygous = secondary_ratio > 0.25
+        
+        return {
+            'is_heterozygous': is_heterozygous,
+            'secondary_base': secondary[0],
+            'secondary_ratio': secondary_ratio,
+            'peak_heights': peak_heights
+        }
+    except Exception as e:
+        print(f"检测杂合失败: {e}")
+        return {
+            'is_heterozygous': False,
+            'secondary_base': 'N',
+            'secondary_ratio': 0.0,
+            'peak_heights': {}
+        }
+
+
 def plot_genome_alignment(ab1_file, output_file='genome_alignment.png', 
-                        window_size=10, ref_file=None, chrom=None, pos=None):
+                        window_size=10, ref_file=None, chrom=None, pos=None,
+                        variant_output_file=None):
     """
     与基因组比对并绘制指定位置左右10bp的峰图
     使用bwa进行比对
@@ -256,6 +312,7 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
         ref_file: 参考基因组文件路径
         chrom: 手动指定的染色体（可选，如果未指定则使用bwa比对结果）
         pos: 手动指定的位置（可选，如果未指定则使用bwa比对结果）
+        variant_output_file: 变异结果输出文件路径（可选，默认为output_file同名txt文件）
     """
     print(f"正在处理文件: {ab1_file}")
     
@@ -281,8 +338,15 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     
     # 检查是否为反向测序（R端），如果是则反向互补
     from Bio.Seq import Seq
-    # 检查文件名中是否包含R（反向测序）
-    is_reverse = '(R)' in ab1_file or '_R_' in ab1_file or '-R_' in ab1_file or 'R)' in ab1_file or '-R-' in ab1_file
+    # 检查文件名中是否包含-F或-R（正向/反向测序）
+    # 通过样本名称中的-F或-R来识别，如 _GA-F_ 或 _GA-R_
+    import re
+    # 匹配 _XX-F_ 或 _XX-R_ 模式，支持 NF/NR 格式
+    # F端: -F_ 或 NF_ 或 -F. 或 NF.
+    # R端: -R_ 或 NR_ 或 -R. 或 NR.
+    f_match = re.search(r'(NF|-F)([_.-]|$)', ab1_file)
+    r_match = re.search(r'(NR|-R)([_.-]|$)', ab1_file)
+    is_reverse = bool(r_match) and not bool(f_match)
     if is_reverse:
         print("检测到反向测序（R端），进行反向互补")
         sample_seq = str(Seq(sample_seq).reverse_complement())
@@ -393,9 +457,9 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
                 sample_matched.append(sample_base)
                 ref_matched.append(ref_base)
                 
-                # 检查变异
+                # 检查变异 (记录原始样本序列位置)
                 if sample_base != ref_base:
-                    variants.append((len(sample_matched) - 1, 'mutation', ref_base, sample_base))
+                    variants.append((current_sample_pos + i, 'mutation', ref_base, sample_base))
             
             current_sample_pos += length
             current_ref_pos += length
@@ -405,7 +469,7 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
                 ref_base = ref_seq[current_ref_pos + i]
                 sample_matched.append('-')
                 ref_matched.append(ref_base)
-                variants.append((len(sample_matched) - 1, 'deletion', ref_base, '-'))
+                variants.append((current_sample_pos + i - 1 if current_sample_pos > 0 else 0, 'deletion', ref_base, '-'))
             current_ref_pos += length
         
         elif op == 'I':  # 插入（样本序列有，参考序列无）
@@ -413,7 +477,7 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
                 sample_base = sample_seq[current_sample_pos + i]
                 sample_matched.append(sample_base)
                 ref_matched.append('-')
-                variants.append((len(sample_matched) - 1, 'insertion', '-', sample_base))
+                variants.append((current_sample_pos + i, 'insertion', '-', sample_base))
             current_sample_pos += length
         
         elif op == 'S':  # 软剪切（样本序列有，参考序列无）
@@ -454,6 +518,111 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     
     # 获取碱基位置
     base_locs = np.array(record.annotations['abif_raw']['PLOC1'])
+    
+    # 对检测到的变异进行杂合检测
+    enhanced_variants = []
+    for var in variants:
+        var_pos, var_type, ref_base, var_base = var[:4]
+        # 计算变异在原始样本序列中的索引
+        # 需要考虑软剪切
+        actual_sample_idx = var_pos
+        
+        # 检测杂合
+        if var_type == 'mutation' and actual_sample_idx < len(base_locs):
+            het_result = detect_heterozygous(traces, base_locs, actual_sample_idx, var_base)
+            enhanced_variants.append({
+                'position': var_pos,
+                'type': var_type,
+                'ref_base': ref_base,
+                'var_base': var_base,
+                'is_heterozygous': het_result['is_heterozygous'],
+                'secondary_base': het_result['secondary_base'],
+                'secondary_ratio': het_result['secondary_ratio'],
+                'peak_heights': het_result['peak_heights']
+            })
+            if het_result['is_heterozygous']:
+                print(f"变异位置 {var_pos}: {ref_base}->{var_base} (杂合, 次峰: {het_result['secondary_base']}, 比例: {het_result['secondary_ratio']:.2f})")
+            else:
+                print(f"变异位置 {var_pos}: {ref_base}->{var_base} (纯合)")
+        else:
+            enhanced_variants.append({
+                'position': var_pos,
+                'type': var_type,
+                'ref_base': ref_base,
+                'var_base': var_base,
+                'is_heterozygous': False,
+                'secondary_base': 'N',
+                'secondary_ratio': 0.0,
+                'peak_heights': {}
+            })
+    
+    variants = enhanced_variants
+    
+    # 输出变异结果到txt文件
+    if variant_output_file is None and output_file:
+        variant_output_file = os.path.splitext(output_file)[0] + '_variants.txt'
+    
+    if variants and variant_output_file:
+        with open(variant_output_file, 'w', encoding='utf-8') as f:
+            f.write(f"# 变异检测结果\n")
+            f.write(f"# 文件: {ab1_file}\n")
+            f.write(f"# 染色体: {chrom}\n")
+            f.write(f"# 比对位置: {bwa_pos}\n")
+            f.write(f"# CIGAR: {cigar}\n")
+            f.write(f"# 变异数量: {len(variants)}\n")
+            f.write(f"#\n")
+            f.write(f"样本位置\t类型\t参考碱基\t样本碱基\t纯杂合状态\t次峰碱基\t次峰比例\t峰高(A)\t峰高(T)\t峰高(C)\t峰高(G)\t基因组位置\n")
+            
+            for var in variants:
+                var_pos = var['position']
+                var_type = var['type']
+                ref_base = var['ref_base']
+                var_base = var['var_base']
+                is_het = var['is_heterozygous']
+                sec_base = var['secondary_base']
+                sec_ratio = var['secondary_ratio']
+                peak_heights = var['peak_heights']
+                
+                het_status = "杂合" if is_het else "纯合"
+                
+                peak_a = peak_heights.get('A', 0)
+                peak_t = peak_heights.get('T', 0)
+                peak_c = peak_heights.get('C', 0)
+                peak_g = peak_heights.get('G', 0)
+                
+                # 计算基因组位置
+                if bwa_pos and cigar:
+                    cigar_ops = re.findall(r'(\d+)([MIDNSHP=X])', cigar)
+                    ref_offset = 0
+                    sample_offset = 0
+                    for length, op in cigar_ops:
+                        length = int(length)
+                        if op in ['M', '=', 'X']:
+                            if sample_offset + length > var_pos:
+                                genome_pos = bwa_pos + ref_offset + (var_pos - sample_offset)
+                                break
+                            sample_offset += length
+                            ref_offset += length
+                        elif op == 'D':
+                            ref_offset += length
+                        elif op == 'I':
+                            if sample_offset + length > var_pos:
+                                genome_pos = bwa_pos + ref_offset
+                                break
+                            sample_offset += length
+                        elif op == 'S':
+                            if sample_offset + length > var_pos:
+                                genome_pos = bwa_pos + ref_offset
+                                break
+                            sample_offset += length
+                    else:
+                        genome_pos = bwa_pos + ref_offset
+                else:
+                    genome_pos = "N/A"
+                
+                f.write(f"{var_pos}\t{var_type}\t{ref_base}\t{var_base}\t{het_status}\t{sec_base}\t{sec_ratio:.2f}\t{peak_a:.0f}\t{peak_t:.0f}\t{peak_c:.0f}\t{peak_g:.0f}\t{genome_pos}\n")
+        
+        print(f"变异结果已保存到: {variant_output_file}")
     
     # 确定目标位置在样本序列中的索引
     # 使用bwa比对结果计算目标位置
@@ -760,15 +929,26 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     }
 
 
-def batch_process_ab1_files(ab1_files, output_dir=None, window_size=25, ref_file=None):
+def batch_process_ab1_files(ab1_files, output_dir=None, window_size=25, ref_file=None, combined_output=None):
     """
     批量处理多个AB1文件
+    
+    参数:
+        ab1_files: AB1文件列表
+        output_dir: 输出目录
+        window_size: 显示窗口大小
+        ref_file: 参考基因组文件
+        combined_output: 合并输出文件路径（可选，默认为output_dir/variants_combined.txt）
     """
     if output_dir is None:
         output_dir = os.getcwd()
     
     os.makedirs(output_dir, exist_ok=True)
     
+    if combined_output is None:
+        combined_output = os.path.join(output_dir, 'variants_combined.txt')
+    
+    all_variants = []
     results = []
     for ab1_file in ab1_files:
         if not ab1_file.endswith('.ab1'):
@@ -782,6 +962,82 @@ def batch_process_ab1_files(ab1_files, output_dir=None, window_size=25, ref_file
         result = plot_genome_alignment(ab1_file, output_file, window_size, ref_file)
         if result:
             results.append(result)
+            # 收集变异信息
+            for var in result.get('variants', []):
+                all_variants.append({
+                    'file': ab1_file,
+                    'filename': filename,
+                    'chrom': result.get('chrom'),
+                    'bwa_pos': result.get('bwa_pos'),
+                    'cigar': result.get('cigar'),
+                    **var
+                })
+    
+    # 输出合并的变异结果
+    if all_variants:
+        with open(combined_output, 'w', encoding='utf-8') as f:
+            f.write(f"# 变异检测结果汇总\n")
+            f.write(f"# 处理文件数: {len(results)}\n")
+            f.write(f"# 变异总数: {len(all_variants)}\n")
+            f.write(f"# 生成时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"#\n")
+            f.write(f"文件名\t染色体\t样本位置\t类型\t参考碱基\t样本碱基\t纯杂合状态\t次峰碱基\t次峰比例\t峰高(A)\t峰高(T)\t峰高(C)\t峰高(G)\t基因组位置\n")
+            
+            for var in all_variants:
+                filename = var.get('filename', '')
+                chrom = var.get('chrom', '')
+                var_pos = var.get('position', '')
+                var_type = var.get('type', '')
+                ref_base = var.get('ref_base', '')
+                var_base = var.get('var_base', '')
+                is_het = var.get('is_heterozygous', False)
+                sec_base = var.get('secondary_base', 'N')
+                sec_ratio = var.get('secondary_ratio', 0.0)
+                peak_heights = var.get('peak_heights', {})
+                bwa_pos = var.get('bwa_pos')
+                cigar = var.get('cigar', '')
+                
+                het_status = "杂合" if is_het else "纯合"
+                
+                peak_a = peak_heights.get('A', 0)
+                peak_t = peak_heights.get('T', 0)
+                peak_c = peak_heights.get('C', 0)
+                peak_g = peak_heights.get('G', 0)
+                
+                # 计算基因组位置
+                if bwa_pos and cigar:
+                    cigar_ops = re.findall(r'(\d+)([MIDNSHP=X])', cigar)
+                    ref_offset = 0
+                    sample_offset = 0
+                    genome_pos = bwa_pos
+                    for length, op in cigar_ops:
+                        length = int(length)
+                        if op in ['M', '=', 'X']:
+                            if sample_offset + length > var_pos:
+                                genome_pos = bwa_pos + ref_offset + (var_pos - sample_offset)
+                                break
+                            sample_offset += length
+                            ref_offset += length
+                        elif op == 'D':
+                            ref_offset += length
+                        elif op == 'I':
+                            if sample_offset + length > var_pos:
+                                genome_pos = bwa_pos + ref_offset
+                                break
+                            sample_offset += length
+                        elif op == 'S':
+                            if sample_offset + length > var_pos:
+                                genome_pos = bwa_pos + ref_offset
+                                break
+                            sample_offset += length
+                    else:
+                        genome_pos = bwa_pos + ref_offset
+                else:
+                    genome_pos = "N/A"
+                
+                f.write(f"{filename}\t{chrom}\t{var_pos}\t{var_type}\t{ref_base}\t{var_base}\t{het_status}\t{sec_base}\t{sec_ratio:.2f}\t{peak_a:.0f}\t{peak_t:.0f}\t{peak_c:.0f}\t{peak_g:.0f}\t{genome_pos}\n")
+        
+        print(f"\n合并变异结果已保存到: {combined_output}")
     
     print(f"\n共处理 {len(results)} 个AB1文件")
     return results
@@ -817,11 +1073,40 @@ def main():
         else:
             ab1_files = glob.glob(sys.argv[1])
         
-        output_dir = sys.argv[2] if len(sys.argv) > 2 else 'genome_alignments'
-        window_size = int(sys.argv[3]) if len(sys.argv) > 3 else 10
-        ref_file = sys.argv[4] if len(sys.argv) > 4 else None
+        # 解析命名参数
+        output_dir = 'genome_alignments'
+        window_size = 10
+        ref_file = None
+        combined_output = None
         
-        batch_process_ab1_files(ab1_files, output_dir, window_size, ref_file)
+        i = 2
+        while i < len(sys.argv):
+            if sys.argv[i] == '--window_size' and i + 1 < len(sys.argv):
+                window_size = int(sys.argv[i + 1])
+                i += 2
+            elif sys.argv[i] == '--output_dir' and i + 1 < len(sys.argv):
+                output_dir = sys.argv[i + 1]
+                i += 2
+            elif sys.argv[i] == '--ref_file' and i + 1 < len(sys.argv):
+                ref_file = sys.argv[i + 1]
+                i += 2
+            elif sys.argv[i] == '--combined_output' and i + 1 < len(sys.argv):
+                combined_output = sys.argv[i + 1]
+                i += 2
+            elif not sys.argv[i].startswith('--'):
+                # 位置参数
+                if output_dir == 'genome_alignments':
+                    output_dir = sys.argv[i]
+                elif window_size == 10:
+                    try:
+                        window_size = int(sys.argv[i])
+                    except ValueError:
+                        pass
+                i += 1
+            else:
+                i += 1
+        
+        batch_process_ab1_files(ab1_files, output_dir, window_size, ref_file, combined_output)
     else:
         ab1_file = sys.argv[1]
         
@@ -830,7 +1115,7 @@ def main():
         pos = None
         arg_offset = 2
         
-        if len(sys.argv) > 2 and ':' in sys.argv[2]:
+        if len(sys.argv) > 2 and ':' in sys.argv[2] and not sys.argv[2].startswith('--'):
             # 手动指定了染色体位置
             chrom_pos = sys.argv[2]
             parts = chrom_pos.split(':')
@@ -843,9 +1128,34 @@ def main():
                     print(f"错误: 无效的位置格式: {parts[1]}")
                     sys.exit(1)
         
-        output_file = sys.argv[arg_offset] if len(sys.argv) > arg_offset else f'genome_alignment_{os.path.splitext(os.path.basename(ab1_file))[0]}.png'
-        window_size = int(sys.argv[arg_offset + 1]) if len(sys.argv) > arg_offset + 1 else 10
-        ref_file = sys.argv[arg_offset + 2] if len(sys.argv) > arg_offset + 2 else None
+        # 解析命名参数
+        output_file = f'genome_alignment_{os.path.splitext(os.path.basename(ab1_file))[0]}.png'
+        window_size = 10
+        ref_file = None
+        
+        i = arg_offset
+        while i < len(sys.argv):
+            if sys.argv[i] == '--window_size' and i + 1 < len(sys.argv):
+                window_size = int(sys.argv[i + 1])
+                i += 2
+            elif sys.argv[i] == '--output' and i + 1 < len(sys.argv):
+                output_file = sys.argv[i + 1]
+                i += 2
+            elif sys.argv[i] == '--ref_file' and i + 1 < len(sys.argv):
+                ref_file = sys.argv[i + 1]
+                i += 2
+            elif not sys.argv[i].startswith('--'):
+                # 位置参数
+                if arg_offset == 2 or (arg_offset == 3 and output_file.startswith('genome_alignment_')):
+                    output_file = sys.argv[i]
+                elif window_size == 10:
+                    try:
+                        window_size = int(sys.argv[i])
+                    except ValueError:
+                        pass
+                i += 1
+            else:
+                i += 1
         
         # 调用函数时传递手动指定的染色体位置
         plot_genome_alignment(ab1_file, output_file, window_size, ref_file, chrom, pos)
