@@ -1204,12 +1204,12 @@
             document.getElementById("workspaceEmpty").style.display = "none";
             document.getElementById("batchWorkspace").style.display = "none";
 
-            const variantRows = (data.variants || []).map(([position, type, ref, alt]) => `
+            const variantRows = (data.variants || []).map((variant) => `
                 <tr>
-                    <td>${position}</td>
-                    <td><span class="variant-tag ${escapeHtml(type)}">${escapeHtml(type)}</span></td>
-                    <td>${escapeHtml(String(ref))}</td>
-                    <td>${escapeHtml(String(alt))}</td>
+                    <td>${variant.position}</td>
+                    <td><span class="variant-tag ${escapeHtml(variant.type)}">${escapeHtml(variant.type)}</span></td>
+                    <td>${escapeHtml(String(variant.ref_base))}</td>
+                    <td>${escapeHtml(String(variant.var_base))}</td>
                 </tr>
             `).join("");
 
