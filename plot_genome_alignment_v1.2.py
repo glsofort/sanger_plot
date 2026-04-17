@@ -338,8 +338,15 @@ def plot_genome_alignment(ab1_file, output_file='genome_alignment.png',
     
     # 检查是否为反向测序（R端），如果是则反向互补
     from Bio.Seq import Seq
-    # 检查文件名中是否包含R（反向测序）
-    is_reverse = '(R)' in ab1_file or '_R_' in ab1_file or '-R_' in ab1_file or 'R)' in ab1_file or '-R-' in ab1_file
+    # 检查文件名中是否包含-F或-R（正向/反向测序）
+    # 通过样本名称中的-F或-R来识别，如 _GA-F_ 或 _GA-R_
+    import re
+    # 匹配 _XX-F_ 或 _XX-R_ 模式，支持 NF/NR 格式
+    # F端: -F_ 或 NF_ 或 -F. 或 NF.
+    # R端: -R_ 或 NR_ 或 -R. 或 NR.
+    f_match = re.search(r'(NF|-F)([_.-]|$)', ab1_file)
+    r_match = re.search(r'(NR|-R)([_.-]|$)', ab1_file)
+    is_reverse = bool(r_match) and not bool(f_match)
     if is_reverse:
         print("检测到反向测序（R端），进行反向互补")
         sample_seq = str(Seq(sample_seq).reverse_complement())
